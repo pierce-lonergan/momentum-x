@@ -1,0 +1,75 @@
+# ╔══════════════════════════════════════════════════════════════╗
+# ║              MOMENTUM-X CI Pipeline                         ║
+# ║  Runs on every push to main and all PRs                     ║
+# ║  No API keys required — tests use mocks only                ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ matrix.python-version }}-
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Lint (ruff)
+        run: ruff check src/ config/ tests/ main.py
+
+      - name: Format check (ruff)
+        run: ruff format --check src/ config/ tests/ main.py
+
+      - name: Test suite
+        run: python -m pytest tests/ -v --tb=short -x
+        env:
+          PYTHONPATH: .
+
+  # Separate job for type checking (can be slower)
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: MyPy (non-blocking for now)
+        run: mypy src/ config/ --ignore-missing-imports || true
+        # TODO: Make strict once all stubs are resolved

@@ -65,8 +65,13 @@ class Orchestrator:
     Ref: SYSTEM_ARCHITECTURE.md (Data Flow)
     """
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        websocket_client: Any | None = None,
+    ) -> None:
         self._settings = settings
+        self._ws_client = websocket_client  # H-006: Real VWAP from streaming
 
         # ── Initialize agents per ADR-001 Model Tiering ──
         # Tier 1 (DeepSeek R1-32B): Reasoning-heavy agents
@@ -239,6 +244,20 @@ class Orchestrator:
 
     # ── Private Methods ──────────────────────────────────────────────
 
+    def _get_vwap(self, ticker: str, fallback_price: float) -> float:
+        """
+        Get real VWAP from WebSocket client, with fallback.
+
+        H-006 RESOLUTION: Uses VWAPAccumulator from streaming trades when available.
+        Falls back to price × 0.98 approximation when WebSocket not connected.
+        """
+        if self._ws_client is not None:
+            vwap = self._ws_client.get_vwap(ticker)
+            if vwap > 0:
+                return vwap
+        # Fallback: conservative approximation (intraday VWAP typically near price)
+        return fallback_price * 0.98
+
     async def _dispatch_agents(
         self,
         candidate: CandidateStock,
@@ -267,7 +286,7 @@ class Orchestrator:
                 ticker=candidate.ticker,
                 current_price=candidate.current_price,
                 rvol=candidate.rvol,
-                vwap=candidate.current_price * 0.98,  # H-006: approximate, needs real VWAP
+                vwap=self._get_vwap(candidate.ticker, candidate.current_price),
                 price_data={},
                 indicators={},
             ),

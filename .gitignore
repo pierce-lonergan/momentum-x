@@ -1,0 +1,36 @@
+# ── Environment & Secrets (CRITICAL — never commit) ──
+.env
+*.pem
+*.key
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ── Testing ──
+.pytest_cache/
+.hypothesis/
+htmlcov/
+.coverage
+coverage.xml
+
+# ── Tools ──
+.ruff_cache/
+.mypy_cache/
+.vscode/
+.idea/
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+
+# ── Project ──
+logs/
+data/
+*.tar.gz

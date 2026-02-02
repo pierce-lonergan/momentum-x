@@ -1,3 +1,59 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "momentum-x"
+version = "0.1.0"
+description = "AI-powered explosive momentum trading system using multi-agent debate"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [{ name = "Momentum-X Contributors" }]
+keywords = ["trading", "algorithmic-trading", "llm", "multi-agent", "alpaca", "momentum"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
+
+dependencies = [
+    "pydantic>=2.0,<3.0",
+    "pydantic-settings>=2.0,<3.0",
+    "httpx>=0.27,<1.0",
+    "websockets>=12.0,<14.0",
+    "litellm>=1.40,<2.0",
+    "python-dotenv>=1.0,<2.0",
+    "anyio>=4.0,<5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23,<1.0",
+    "hypothesis>=6.100",
+    "ruff>=0.4",
+    "mypy>=1.10",
+    "pre-commit>=3.7",
+]
+
+[project.urls]
+Homepage = "https://github.com/momentum-x/momentum-x"
+Documentation = "https://github.com/momentum-x/momentum-x#readme"
+Repository = "https://github.com/momentum-x/momentum-x"
+Issues = "https://github.com/momentum-x/momentum-x/issues"
+
+[project.scripts]
+momentum-x = "main:main"
+
+# ── Tool Configuration ──────────────────────────────────────
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
@@ -5,3 +61,20 @@ addopts = "-v --tb=short"
 
 [tool.hypothesis]
 max_examples = 200
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["E501", "B008"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src", "config"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+disallow_untyped_defs = true

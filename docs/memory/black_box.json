@@ -1,84 +1,85 @@
 {
   "protocol": "TOR-P",
-  "session_id": "S004_ALPACA_INTEGRATION",
-  "timestamp": "2026-02-02T03:00:00Z",
+  "session_id": "S006_PROJECT_HARDENING",
+  "timestamp": "2026-02-02T05:00:00Z",
 
   "resumption_vector": {
     "completed_this_session": [
-      "docs/research/ALPACA_API_CONSTRAINTS.md — 12 constraints catalogued from API reference",
-      "ADR-004 — Rate limiting, SIP enforcement, condition code filtering, WebSocket chunking",
-      "utils.rate_limiter — Token bucket: 180 req/min trading, 9000 req/min market data",
-      "utils.trade_filter — Condition code filter (Z,U,4,C excluded) + chunk_symbols(400/frame)",
-      "agent.fundamental — Float structure, dilution risk. Large float→NEUTRAL cap",
-      "agent.institutional — Options/dark pool flow. Multi-source required for STRONG_BULL",
-      "agent.deep_search — SEC/social/historical cross-reference. Confirmation only",
-      "data.alpaca_client HARDENED — rate limiters integrated, PDT check, asset check, extended hours",
-      "core.orchestrator UPGRADED — all 6 agents in 2-phase dispatch",
-      "main.py — CLI entrypoint: scan, evaluate, paper, backtest modes",
-      "Integration tests fixed for 6-agent pipeline",
-      "26 new tests (109 total, all passing)"
+      "ADR-006: CI/CD Pipeline and Code Quality Gates",
+      "GitHub Actions CI: Python 3.11+3.12 matrix, lint, format-check, test, mypy",
+      "Pre-commit hooks: ruff, detect-secrets, detect-private-key, large files, YAML/JSON/TOML check",
+      ".secrets.baseline: detect-secrets baseline for pre-commit",
+      "SEC EDGAR client (data.sec_client): EFTS search, dilution detection (S-3→WARNING, 424B5→CRITICAL), CIK lookup",
+      "docs/research/SEC_EDGAR_INTEGRATION.md: Filing types, float calculation, rate limiting",
+      "RESOLVES H-004: Float data freshness via SEC EDGAR dilution detection",
+      "Prompt Arena (agents.prompt_arena): Elo tournament, cold start exploration, warm exploitation, JSON persistence",
+      "docs/research/PROMPT_ARENA.md: Elo math, cold start strategy, LMSYS reference",
+      "RESOLVES H-003: Arena cold start via exploration-exploitation threshold (match_count < 10)",
+      "Orchestrator VWAP integration: _get_vwap() uses WebSocket client when available, fallback to 0.98× approx",
+      "H-006 FULLY WIRED: WebSocket VWAPAccumulator → orchestrator → technical agent",
+      "Slippage model (execution.slippage): Almgren-Chriss √(Q/V)×σ + spread + fixed. 5% cap.",
+      "RESOLVES H-009: Synthetic slippage for backtesting (paper trading infinite liquidity gap)",
+      "MOMENTUM_LOGIC.md §11-12: Slippage model + Elo rating formalization in LaTeX",
+      "51 new tests (178 total, all passing, ZERO warnings)"
     ],
     "immediate_next": {
       "file": "src/data/websocket_client.py",
-      "line": 1,
-      "task": "Implement Alpaca WebSocket streaming for real-time trades/quotes/bars with condition code filtering and reconnection"
+      "task": "Add trade_updates WebSocket channel for order fill events — needed for H-008 trailing stop workaround (submit trailing stop after bracket entry fills)"
     },
     "secondary_targets": [
-      "src/agents/prompt_arena.py — Elo rating tournament (H-003)",
-      "src/scanners/float_scanner.py — SEC EDGAR float cross-reference (H-004)",
-      "src/data/sec_client.py — SEC EDGAR/EFTS client for 10-K/8-K/S-3 filings",
-      "Real VWAP computation from minute bars (H-006)",
-      "Fix datetime.utcnow() deprecation warnings in TradeVerdict defaults"
+      "Wire SEC client into fundamental_agent for live dilution queries",
+      "Wire slippage model into backtester for realistic execution simulation",
+      "Register default prompt variants in arena for each of the 6 agents",
+      "Integration test: SEC client → fundamental agent → dilution red flag → BEAR signal",
+      "Integration test: slippage model → backtester → PnL adjustment",
+      "Web dashboard (Flask/FastAPI + React)",
+      "Property-based tests for slippage model (Hypothesis)"
     ]
   },
 
   "unresolved_hypotheses": {
     "H-001": {"status": "RESOLVED"},
     "H-002": {"status": "OPEN", "statement": "R1 JSON reliability", "blocking": "Live LLM test"},
-    "H-003": {"status": "OPEN", "statement": "Arena cold start", "blocking": "prompt_arena.py"},
-    "H-004": {"status": "OPEN", "statement": "Float data freshness", "blocking": "float_scanner.py"},
+    "H-003": {"status": "RESOLVED", "resolution": "PromptArena with Elo ratings. Cold start (<10 matches) → random exploration. Warm → highest Elo exploitation."},
+    "H-004": {"status": "RESOLVED", "resolution": "SECEdgarClient: EFTS search + classify_filing_risk(). S-3→WARNING (90d), 424B5→CRITICAL (30d)."},
     "H-005": {"status": "RESOLVED"},
-    "H-006": {"status": "OPEN", "statement": "VWAP approximated", "blocking": "websocket_client minute bar aggregation"},
+    "H-006": {"status": "RESOLVED", "resolution": "VWAPAccumulator + orchestrator._get_vwap() — fully wired from WebSocket to technical agent."},
     "H-007": {"status": "RESOLVED"},
     "H-008": {
-      "status": "NEW",
-      "statement": "Alpaca bracket orders cannot use trailing_stop legs (CONSTRAINT-003). Manual trailing via trade_updates WebSocket required.",
-      "blocking": "websocket_client.py trade_updates listener",
-      "workaround": "position_manager._ratchet_stop() implements manual stop ratcheting, but needs WebSocket fill events to trigger"
+      "status": "OPEN",
+      "statement": "Bracket orders can't use trailing_stop legs",
+      "blocking": "trade_updates WebSocket channel listener",
+      "workaround": "position_manager._ratchet_stop() + manual trailing stop submission post-fill"
     },
-    "H-009": {
-      "status": "NEW",
-      "statement": "Paper trading infinite liquidity assumption (CONSTRAINT-006). Large orders fill instantly at last price with no slippage.",
-      "blocking": "backtester synthetic slippage model",
-      "workaround": "executor.OrderResult already tracks signal_price vs fill_price gap"
-    }
+    "H-009": {"status": "RESOLVED", "resolution": "SlippageModel: Almgren-Chriss √(Q/V)×σ + spread_crossing + fixed_bps. Capped at 5%."}
   },
 
   "cognitive_load": {
     "critical_context": [
-      "ALL 6 AGENTS OPERATIONAL: news(T1), technical(T2), fundamental(T2), institutional(T2), deep_search(T2), risk(T1)",
-      "FULL PIPELINE: Scanner→5 analytical(parallel)→risk(sequential)→MFCS→Debate(if>0.6)→Verdict",
-      "Rate limiter: Trading 180/min (token bucket), Market Data 9000/min. Integrated into alpaca_client.",
-      "Trade condition filter: Regular session excludes Z,U,T,4,C,I,W. Pre-market allows U,T but excludes Z,4,C.",
-      "WebSocket chunking: 400 symbols/frame (under 16KB limit per CONSTRAINT-005)",
-      "New Alpaca features: check_pdt_status(), check_asset_tradable(), submit_extended_hours_order()",
-      "CLI: python -m main {scan|evaluate|paper|backtest}. Live requires typed confirmation.",
-      "BRACKET TRAILING STOP BUG (H-008): Alpaca can't do trailing in brackets. Must listen for fills on WebSocket."
+      "178 TESTS, ZERO WARNINGS. All hypotheses except H-002 and H-008 resolved.",
+      "CI pipeline: GitHub Actions (3.11+3.12 matrix) + pre-commit (ruff, secrets, keys)",
+      "SEC EDGAR: EFTS search → Filing → classify_filing_risk() → DilutionAssessment",
+      "Prompt Arena: Elo tournament with cold start exploration (H-003 resolved)",
+      "Slippage: 3-component model (fixed + volume_impact + spread). H-009 resolved.",
+      "Orchestrator VWAP: _get_vwap() checks ws_client first, falls back to 0.98× approx",
+      "MOMENTUM_LOGIC.md now has 12 sections covering all core mathematics"
     ],
     "architectural_debt": [
-      "H-006: VWAP still approximated as price*0.98 in orchestrator",
-      "H-008: No WebSocket client yet — all data is REST polling",
-      "H-009: Backtester needs synthetic slippage model for paper trading gap",
-      "No float_scanner.py (H-004) or SEC client",
-      "Prompt Arena not built (H-003)",
-      "datetime.utcnow() deprecation warnings in Pydantic defaults"
+      "H-002: R1 JSON reliability — needs live LLM integration test",
+      "H-008: Trailing stop workaround needs trade_updates WebSocket listener",
+      "SEC client not yet wired into fundamental agent's live pipeline",
+      "Slippage model not yet wired into backtester",
+      "No default prompt variants registered in arena for each agent",
+      "No web dashboard",
+      "MyPy runs in non-blocking mode (stubs needed for strict)"
     ]
   },
 
   "test_state": {
-    "total": 109,
-    "passing": 109,
+    "total": 178,
+    "passing": 178,
     "failing": 0,
+    "warnings": 0,
     "suites": {
       "tests/property/test_scanner_properties.py": 19,
       "tests/unit/test_scoring.py": 9,
@@ -89,27 +90,32 @@
       "tests/unit/test_executor.py": 10,
       "tests/unit/test_backtester.py": 10,
       "tests/unit/test_technical_agent.py": 5,
-      "tests/unit/test_remaining_agents.py": 11,
+      "tests/unit/test_remaining_agents.py": 12,
       "tests/unit/test_rate_limiter.py": 14,
+      "tests/unit/test_websocket.py": 18,
+      "tests/unit/test_prompt_arena.py": 20,
+      "tests/unit/test_sec_client.py": 18,
+      "tests/unit/test_slippage.py": 13,
       "tests/integration/test_pipeline.py": 2
     }
   },
 
   "files_created_this_session": [
-    "docs/research/ALPACA_API_CONSTRAINTS.md",
-    "docs/decisions/ADR_004_RATE_LIMITING_AND_DATA_FEED.md",
-    "src/utils/rate_limiter.py",
-    "src/utils/trade_filter.py",
-    "src/agents/fundamental_agent.py",
-    "src/agents/institutional_agent.py",
-    "src/agents/deep_search_agent.py",
-    "main.py",
-    "tests/unit/test_rate_limiter.py",
-    "tests/unit/test_remaining_agents.py"
+    "docs/decisions/ADR_006_CI_CD_AND_QUALITY_GATES.md",
+    "docs/research/SEC_EDGAR_INTEGRATION.md",
+    "docs/research/PROMPT_ARENA.md",
+    ".github/workflows/ci.yml",
+    ".pre-commit-config.yaml",
+    ".secrets.baseline",
+    "src/data/sec_client.py",
+    "src/agents/prompt_arena.py",
+    "src/execution/slippage.py",
+    "tests/unit/test_sec_client.py",
+    "tests/unit/test_prompt_arena.py",
+    "tests/unit/test_slippage.py"
   ],
   "files_modified_this_session": [
-    "src/data/alpaca_client.py (rate limiter + PDT + asset + extended hours)",
-    "src/core/orchestrator.py (6-agent dispatch + 3 new agent imports)",
-    "tests/integration/test_pipeline.py (6-agent mock setup)"
+    "src/core/orchestrator.py (WebSocket VWAP integration, _get_vwap helper)",
+    "docs/mathematics/MOMENTUM_LOGIC.md (§11 Slippage, §12 Elo Rating)"
   ]
 }

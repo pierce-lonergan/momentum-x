@@ -1,4 +1,0 @@
-# file: /home/claude/momentum-x/src/scanners/premarket.py
-# hypothesis_version: 6.151.4
-
-[0.0, 0.04, 0.1, 0.2, 'EXPLOSIVE', 'MAJOR', 'MINOR', 'PRE_MARKET', 'SIGNIFICANT', 'avg_volume_at_time', 'current_price', 'float_shares', 'gap_pct', 'has_news', 'market_cap', 'premarket_volume', 'previous_close', 'rvol', 'ticker']

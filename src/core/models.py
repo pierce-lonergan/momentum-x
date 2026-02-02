@@ -18,7 +18,7 @@ Ref: MOMENTUM_LOGIC.md §5 (MFCS), §10 (Debate Divergence)
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -208,7 +208,7 @@ class TradeVerdict(BaseModel, frozen=True):
     )
     time_horizon: TimeHorizon = "INTRADAY"
     reasoning_summary: str = ""
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ─── Arena Tracking ──────────────────────────────────────────────────

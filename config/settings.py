@@ -3,22 +3,32 @@ MOMENTUM-X Configuration
 
 ### ARCHITECTURAL CONTEXT
 Type-safe configuration using pydantic-settings. All secrets load from
-environment variables. Thresholds are derived from docs/mathematics/MOMENTUM_LOGIC.md.
+environment variables or .env file. Thresholds are derived from
+docs/mathematics/MOMENTUM_LOGIC.md.
 
 ### DESIGN DECISIONS
-- pydantic-settings over raw os.environ for validation at startup
+- pydantic-settings over raw os.environ for validation at startup (ADR-005)
 - Nested models for logical grouping (broker, models, thresholds)
 - All threshold defaults match the LaTeX definitions in MOMENTUM_LOGIC.md
+- .env file auto-loaded for developer convenience (ADR-005 §2)
+- SIP feed enforced as default (ADR-004 §1, CONSTRAINT-001)
 """
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic import Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+# Resolve .env relative to project root
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_ENV_FILE = _PROJECT_ROOT / ".env"
 
 
 class AlpacaConfig(BaseSettings):
-    """Alpaca broker configuration. Ref: DATA-001."""
+    """Alpaca broker configuration. Ref: DATA-001, DATA-001-EXT."""
 
     api_key: str = Field(default="", description="Alpaca API key ID")
     secret_key: str = Field(default="", description="Alpaca API secret key")
@@ -28,14 +38,14 @@ class AlpacaConfig(BaseSettings):
     )
     data_url: str = Field(
         default="https://data.alpaca.markets",
-        description="Market data endpoint",
+        description="Market data endpoint (shared across paper/live)",
     )
     feed: str = Field(
-        default="iex",
-        description="Data feed: 'iex' (free) or 'sip' (paid, lower latency)",
+        default="sip",
+        description="Data feed: 'sip' (required for production per ADR-004) or 'iex' (testing only)",
     )
 
-    model_config = {"env_prefix": "ALPACA_"}
+    model_config = SettingsConfigDict(env_prefix="ALPACA_", env_file=str(_ENV_FILE), extra="ignore")
 
 
 class ModelConfig(BaseSettings):
@@ -76,7 +86,7 @@ class ModelConfig(BaseSettings):
     max_tokens: int = Field(default=4096)
     timeout_seconds: int = Field(default=120)
 
-    model_config = {"env_prefix": "LLM_"}
+    model_config = SettingsConfigDict(env_prefix="LLM_", env_file=str(_ENV_FILE), extra="ignore")
 
 
 class ScannerThresholds(BaseSettings):
@@ -143,7 +153,7 @@ class ScannerThresholds(BaseSettings):
     price_min: float = Field(default=0.50, description="Min price filter")
     price_max: float = Field(default=20.00, description="Max price filter")
 
-    model_config = {"env_prefix": "SCAN_"}
+    model_config = SettingsConfigDict(env_prefix="SCAN_", env_file=str(_ENV_FILE), extra="ignore")
 
 
 class ScoringWeights(BaseSettings):
@@ -163,7 +173,7 @@ class ScoringWeights(BaseSettings):
         description="λ risk penalty. MOMENTUM_LOGIC.md §5",
     )
 
-    model_config = {"env_prefix": "SCORE_"}
+    model_config = SettingsConfigDict(env_prefix="SCORE_", env_file=str(_ENV_FILE), extra="ignore")
 
 
 class ExecutionConfig(BaseSettings):
@@ -188,7 +198,7 @@ class ExecutionConfig(BaseSettings):
         description="Close all intraday positions by 3:45 PM ET",
     )
 
-    model_config = {"env_prefix": "EXEC_"}
+    model_config = SettingsConfigDict(env_prefix="EXEC_", env_file=str(_ENV_FILE), extra="ignore")
 
 
 class DebateConfig(BaseSettings):
@@ -207,7 +217,7 @@ class DebateConfig(BaseSettings):
         description="Minimum MFCS to trigger debate engine",
     )
 
-    model_config = {"env_prefix": "DEBATE_"}
+    model_config = SettingsConfigDict(env_prefix="DEBATE_", env_file=str(_ENV_FILE), extra="ignore")
 
 
 class Settings(BaseSettings):

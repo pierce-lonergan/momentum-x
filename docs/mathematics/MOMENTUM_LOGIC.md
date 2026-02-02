@@ -200,3 +200,76 @@ $$
 - $\text{DIV} < 0.3$: High uncertainty → **no trade** (insufficient edge)
 
 **Reference**: REF-001 (TradingAgents debate architecture)
+
+---
+
+## 11. Slippage Model (Execution Cost)
+
+Synthetic execution cost model for realistic backtesting. Resolves H-009.
+
+### 11.1 Fixed Costs
+
+$$
+C_{\text{fixed}} = \frac{\text{bps}}{10{,}000}
+$$
+
+Default: 10 bps (commissions, fees, minimum spread).
+
+### 11.2 Volume Impact (Almgren-Chriss Square Root Model)
+
+$$
+C_{\text{impact}} = \sigma \cdot \sqrt{\frac{Q}{V}}
+$$
+
+Where:
+- $\sigma$ = daily price volatility
+- $Q$ = order quantity (shares)
+- $V$ = average daily volume
+
+**Reference**: Almgren & Chriss (2001), "Optimal Execution of Portfolio Transactions"
+
+### 11.3 Spread Cost
+
+$$
+C_{\text{spread}} = \frac{p_{\text{ask}} - p_{\text{bid}}}{2 \cdot p_{\text{mid}}}
+$$
+
+Market orders cross half the spread from midpoint.
+
+### 11.4 Combined Slippage
+
+$$
+C_{\text{total}} = \min\Big(C_{\text{fixed}} + C_{\text{impact}} + C_{\text{spread}},\ C_{\max}\Big)
+$$
+
+Where $C_{\max} = 0.05$ (5% absolute safety cap).
+
+Effective execution price:
+
+$$
+p_{\text{exec}} = p_{\text{market}} \cdot (1 + \text{sign} \cdot C_{\text{total}})
+$$
+
+Where $\text{sign} = +1$ for buy, $-1$ for sell.
+
+---
+
+## 12. Elo Rating (Prompt Arena)
+
+Prompt variant optimization via tournament ranking. Resolves H-003.
+
+### 12.1 Expected Score
+
+$$
+E_A = \frac{1}{1 + 10^{(R_B - R_A)/400}}
+$$
+
+### 12.2 Rating Update
+
+$$
+R'_A = R_A + K \cdot (S_A - E_A)
+$$
+
+Where $K = 32$ (standard provisional), $S_A \in \{0, 0.5, 1\}$.
+
+**Reference**: Arpad Elo (1978); LMSYS Chatbot Arena methodology
