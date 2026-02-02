@@ -1,7 +1,7 @@
 {
   "protocol": "TOR-P",
-  "version": "S007",
-  "last_updated": "2026-02-02T06:00:00Z",
+  "version": "S008",
+  "last_updated": "2026-02-02T07:00:00Z",
 
   "nodes": {
     "config.settings": {"type": "CONFIG", "file": "config/settings.py", "status": "COMPLETE"},
@@ -9,7 +9,7 @@
     "core.scoring": {"type": "ENGINE", "file": "src/core/scoring.py", "status": "COMPLETE"},
     "core.orchestrator": {
       "type": "ENGINE", "file": "src/core/orchestrator.py", "status": "COMPLETE",
-      "description": "6-agent pipeline. WebSocket VWAP (H-006) + SEC auto-query (H-004) wired."
+      "description": "6-agent pipeline. WebSocket VWAP (H-006) + SEC auto-query (H-004) + PromptArena selection (H-003) wired."
     },
     "core.backtester": {
       "type": "ENGINE", "file": "src/core/backtester.py", "status": "COMPLETE",
@@ -24,31 +24,28 @@
     "agent.deep_search": {"type": "AGENT", "file": "src/agents/deep_search_agent.py", "status": "COMPLETE"},
     "agent.risk": {"type": "AGENT", "file": "src/agents/risk_agent.py", "status": "COMPLETE"},
     "agent.debate_engine": {"type": "ENGINE", "file": "src/agents/debate_engine.py", "status": "COMPLETE"},
-    "agent.prompt_arena": {"type": "ENGINE", "file": "src/agents/prompt_arena.py", "status": "COMPLETE", "resolves": "H-003"},
-    "agent.default_variants": {
-      "type": "CONFIG", "file": "src/agents/default_variants.py", "status": "COMPLETE",
-      "description": "12 prompt variants (2 per agent) seeded for arena tournament"
-    },
+    "agent.prompt_arena": {"type": "ENGINE", "file": "src/agents/prompt_arena.py", "status": "COMPLETE"},
+    "agent.default_variants": {"type": "CONFIG", "file": "src/agents/default_variants.py", "status": "COMPLETE"},
     "data.alpaca_client": {"type": "DATA_CLIENT", "file": "src/data/alpaca_client.py", "status": "COMPLETE"},
     "data.news_client": {"type": "DATA_CLIENT", "file": "src/data/news_client.py", "status": "COMPLETE"},
-    "data.websocket_client": {"type": "DATA_CLIENT", "file": "src/data/websocket_client.py", "status": "COMPLETE", "resolves": "H-006"},
-    "data.sec_client": {"type": "DATA_CLIENT", "file": "src/data/sec_client.py", "status": "COMPLETE", "resolves": "H-004"},
-    "data.trade_updates": {
-      "type": "DATA_CLIENT", "file": "src/data/trade_updates.py", "status": "COMPLETE",
-      "description": "Trade updates WebSocket: fill detection, trailing stop state machine",
-      "resolves": "H-008"
+    "data.websocket_client": {"type": "DATA_CLIENT", "file": "src/data/websocket_client.py", "status": "COMPLETE"},
+    "data.sec_client": {"type": "DATA_CLIENT", "file": "src/data/sec_client.py", "status": "COMPLETE"},
+    "data.trade_updates": {"type": "DATA_CLIENT", "file": "src/data/trade_updates.py", "status": "COMPLETE"},
+    "data.trade_updates_stream": {
+      "type": "DATA_CLIENT", "file": "src/data/websocket_client.py",
+      "status": "COMPLETE",
+      "description": "TradeUpdatesStream: WebSocket listener dispatching to TrailingStopManager"
     },
     "execution.alpaca_executor": {"type": "EXECUTOR", "file": "src/execution/alpaca_executor.py", "status": "COMPLETE"},
     "execution.position_manager": {"type": "EXECUTOR", "file": "src/execution/position_manager.py", "status": "COMPLETE"},
-    "execution.slippage": {"type": "ENGINE", "file": "src/execution/slippage.py", "status": "COMPLETE", "resolves": "H-009"},
-    "execution.trailing_stop_manager": {
-      "type": "ENGINE", "file": "src/data/trade_updates.py",
-      "status": "COMPLETE",
-      "description": "TrailingStopManager: PENDING_FILL→CANCELING_STOP→TRAILING_ACTIVE→CLOSED",
-      "resolves": "H-008"
-    },
+    "execution.slippage": {"type": "ENGINE", "file": "src/execution/slippage.py", "status": "COMPLETE"},
+    "execution.trailing_stop_manager": {"type": "ENGINE", "file": "src/data/trade_updates.py", "status": "COMPLETE"},
     "utils.rate_limiter": {"type": "ENGINE", "file": "src/utils/rate_limiter.py", "status": "COMPLETE"},
     "utils.trade_filter": {"type": "ENGINE", "file": "src/utils/trade_filter.py", "status": "COMPLETE"},
+    "utils.logging": {
+      "type": "ENGINE", "file": "src/utils/trade_logger.py", "status": "COMPLETE",
+      "description": "JSON structured logging + async-safe correlation IDs via contextvars"
+    },
     "cli.main": {"type": "CONFIG", "file": "main.py", "status": "COMPLETE"},
     "dx.readme": {"type": "CONFIG", "file": "README.md", "status": "COMPLETE"},
     "dx.docker": {"type": "CONFIG", "file": "Dockerfile", "status": "COMPLETE"},
@@ -73,17 +70,12 @@
     {"from": "data.websocket_client", "to": "core.orchestrator", "type": "feeds_into"},
     {"from": "data.news_client", "to": "agent.news", "type": "feeds_into"},
     {"from": "data.sec_client", "to": "core.orchestrator", "type": "feeds_into"},
-    {"from": "data.sec_client", "to": "agent.fundamental", "type": "feeds_into"},
-    {"from": "data.trade_updates", "to": "execution.trailing_stop_manager", "type": "feeds_into"},
+    {"from": "data.trade_updates_stream", "to": "execution.trailing_stop_manager", "type": "feeds_into"},
     {"from": "execution.trailing_stop_manager", "to": "execution.alpaca_executor", "type": "coordinates"},
     {"from": "execution.slippage", "to": "core.backtester", "type": "feeds_into"},
-    {"from": "agent.prompt_arena", "to": "agent.news", "type": "optimizes"},
-    {"from": "agent.prompt_arena", "to": "agent.technical", "type": "optimizes"},
-    {"from": "agent.prompt_arena", "to": "agent.fundamental", "type": "optimizes"},
-    {"from": "agent.prompt_arena", "to": "agent.institutional", "type": "optimizes"},
-    {"from": "agent.prompt_arena", "to": "agent.deep_search", "type": "optimizes"},
-    {"from": "agent.prompt_arena", "to": "agent.risk", "type": "optimizes"},
+    {"from": "agent.prompt_arena", "to": "core.orchestrator", "type": "optimizes"},
     {"from": "agent.default_variants", "to": "agent.prompt_arena", "type": "seeds"},
+    {"from": "utils.logging", "to": "core.orchestrator", "type": "observes"},
     {"from": "core.orchestrator", "to": "agent.news", "type": "dispatches"},
     {"from": "core.orchestrator", "to": "agent.technical", "type": "dispatches"},
     {"from": "core.orchestrator", "to": "agent.fundamental", "type": "dispatches"},
@@ -93,6 +85,6 @@
     {"from": "cli.main", "to": "core.orchestrator", "type": "depends_on"}
   ],
 
-  "adrs": ["ADR-001", "ADR-002", "ADR-003", "ADR-004", "ADR-005", "ADR-006", "ADR-007"],
-  "research_docs": ["BIBLIOGRAPHY.md", "ALPACA_API_CONSTRAINTS.md", "SEC_EDGAR_INTEGRATION.md", "PROMPT_ARENA.md"]
+  "adrs": ["ADR-001", "ADR-002", "ADR-003", "ADR-004", "ADR-005", "ADR-006", "ADR-007", "ADR-008"],
+  "research_docs": ["BIBLIOGRAPHY.md", "ALPACA_API_CONSTRAINTS.md", "SEC_EDGAR_INTEGRATION.md", "PROMPT_ARENA.md", "ARENA_LIVE_SELECTION.md"]
 }

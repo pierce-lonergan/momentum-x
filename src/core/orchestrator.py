@@ -70,10 +70,12 @@ class Orchestrator:
         settings: Settings,
         websocket_client: Any | None = None,
         sec_client: Any | None = None,
+        prompt_arena: Any | None = None,
     ) -> None:
         self._settings = settings
         self._ws_client = websocket_client  # H-006: Real VWAP from streaming
         self._sec_client = sec_client  # H-004: SEC EDGAR dilution detection
+        self._prompt_arena = prompt_arena  # H-003: Elo-rated prompt selection
 
         # ── Initialize agents per ADR-001 Model Tiering ──
         # Tier 1 (DeepSeek R1-32B): Reasoning-heavy agents
@@ -293,6 +295,37 @@ class Orchestrator:
                 return vwap
         # Fallback: conservative approximation (intraday VWAP typically near price)
         return fallback_price * 0.98
+
+    def _get_best_prompt(self, agent_id: str) -> dict[str, str] | None:
+        """
+        Get the best prompt variant from the arena for an agent.
+
+        H-003 RESOLUTION: PromptArena Elo-rated selection.
+        Cold start (<10 matches) → random exploration.
+        Warm (≥10 matches) → highest Elo exploitation.
+
+        Args:
+            agent_id: The agent's identifier (e.g., "news_agent").
+
+        Returns:
+            Dict with "system_prompt" and "user_prompt_template" keys,
+            or None if no arena or no variants available.
+
+        Ref: docs/research/ARENA_LIVE_SELECTION.md
+        """
+        if self._prompt_arena is None:
+            return None
+        try:
+            variant = self._prompt_arena.get_best_variant(agent_id)
+            if variant is not None:
+                return {
+                    "system_prompt": variant.system_prompt,
+                    "user_prompt_template": variant.user_prompt_template,
+                    "variant_id": variant.variant_id,
+                }
+        except Exception as e:
+            logger.debug("Arena selection failed for %s: %s", agent_id, e)
+        return None
 
     async def _dispatch_agents(
         self,

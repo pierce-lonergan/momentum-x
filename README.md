@@ -6,7 +6,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/tests-109%20passing-brightgreen.svg)](#testing)
+[![CI](https://img.shields.io/badge/CI-GitHub_Actions-brightgreen.svg)](#ci-cd)
+[![Tests](https://img.shields.io/badge/tests-220%2B%20passing-brightgreen.svg)](#testing)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
 ---
@@ -21,41 +22,48 @@ Momentum-X is an open-source algorithmic trading framework that uses **multiple 
 
 - **Multi-Agent Debate** — 6 agents (News, Technical, Fundamental, Institutional, Deep Search, Risk) evaluate independently, then Bull/Bear/Judge debate synthesizes the verdict
 - **Risk Agent Veto Power** — An adversarial risk agent can unconditionally block any trade. Hard-coded rules catch what LLMs miss
+- **Real-Time Streaming** — WebSocket market data (SIP feed) with sub-second VWAP, trade condition filtering, and exponential backoff reconnection
+- **SEC EDGAR Integration** — Automatic dilution detection via EFTS: S-3 → WARNING, 424B5 → CRITICAL
+- **Prompt Arena (Elo)** — 12 prompt variants compete in tournament-style optimization across all 6 agents
+- **Slippage Modeling** — Almgren-Chriss √(Q/V)×σ volume impact + spread crossing + fixed costs, capped at 5%
+- **Trailing Stop Management** — Two-phase order strategy: bracket entry → fill detection → trailing stop replacement
+- **CPCV Backtesting** — Combinatorially Purged Cross-Validation with slippage-adjusted returns
+- **Structured Logging** — JSON-formatted trade lifecycle tracing with async-safe correlation IDs
 - **Research-Backed** — Every threshold, weight, and constant traces to an academic paper. No magic numbers
-- **Paper Trading First** — Default mode is always paper. Live requires explicit typed confirmation
-- **CPCV Backtesting** — Combinatorially Purged Cross-Validation prevents the #1 strategy killer: overfitting
-- **109+ Tests** — Property-based, unit, and integration tests. Every invariant verified
+- **220+ Tests** — Property-based (Hypothesis), unit, integration, and mathematical invariant tests
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                     MOMENTUM-X PIPELINE                         │
-│                                                                 │
-│  ┌──────────┐     ┌──────────────────────────────────────┐     │
-│  │ Pre-Mkt  │     │    PHASE A: 5 AGENTS (parallel)      │     │
-│  │ Scanner  │────▶│  News · Technical · Fundamental      │     │
-│  │          │     │  Institutional · Deep Search          │     │
-│  │ Gap%     │     └──────────────┬───────────────────────┘     │
-│  │ RVOL     │                    ▼                              │
-│  │ Float    │     ┌──────────────────────────────────────┐     │
-│  └──────────┘     │    PHASE B: RISK AGENT (veto power)  │     │
-│                   └──────────────┬───────────────────────┘     │
-│                                  ▼                              │
-│                   ┌──────────────────────────────────────┐     │
-│                   │         MFCS SCORING (0→1)           │     │
-│                   └──────────────┬───────────────────────┘     │
-│                                  ▼                              │
-│                   ┌──────────────────────────────────────┐     │
-│                   │   DEBATE (Bull vs Bear → Judge)      │     │
-│                   │   Divergence → Position Sizing        │     │
-│                   └──────────────┬───────────────────────┘     │
-│                                  ▼                              │
-│                   ┌──────────────────────────────────────┐     │
-│                   │   EXECUTOR → Bracket Orders           │     │
-│                   │   Circuit Breaker · Scaled Exits      │     │
-│                   └──────────────────────────────────────┘     │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                        MOMENTUM-X PIPELINE                           │
+│                                                                      │
+│  ┌───────────┐    ┌────────────────────────────────────────────┐    │
+│  │ Pre-Mkt   │    │     PHASE A: 5 AGENTS (parallel)          │    │
+│  │ Scanner   │───▶│  News · Technical · Fundamental            │    │
+│  │           │    │  Institutional · Deep Search                │    │
+│  │ Gap%/RVOL │    │  (PromptArena selects best Elo variant)    │    │
+│  │ Float     │    └─────────────────┬──────────────────────────┘    │
+│  └───────────┘                      ▼                               │
+│       │            ┌────────────────────────────────────────────┐    │
+│       │            │     PHASE B: RISK AGENT (veto power)      │    │
+│  ┌────▼─────┐      └─────────────────┬──────────────────────────┘    │
+│  │ WebSocket │                       ▼                               │
+│  │ VWAP     │      ┌────────────────────────────────────────────┐    │
+│  │ Stream   │─────▶│          MFCS SCORING (0→1)               │    │
+│  └──────────┘      └─────────────────┬──────────────────────────┘    │
+│       │                              ▼                               │
+│  ┌────▼─────┐      ┌────────────────────────────────────────────┐    │
+│  │ SEC      │─────▶│    DEBATE (Bull vs Bear → Judge)          │    │
+│  │ EDGAR    │      │    Divergence → Position Sizing            │    │
+│  │ Client   │      └─────────────────┬──────────────────────────┘    │
+│  └──────────┘                        ▼                               │
+│                    ┌────────────────────────────────────────────┐    │
+│                    │    EXECUTOR → Bracket Orders               │    │
+│                    │    Trailing Stops · Circuit Breaker         │    │
+│                    │    Scaled Exits · Slippage Tracking         │    │
+│                    └────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Quickstart
@@ -72,7 +80,7 @@ pip install -e ".[dev]"
 
 # 3. Run tests — no API keys needed!
 make test
-# ✅ 109 passed
+# ✅ 220+ passed, 0 warnings
 
 # 4. Configure
 cp .env.example .env
@@ -110,25 +118,19 @@ TOGETHER_AI_API_KEY=your_together_key
 
 Everything else has research-derived defaults. See [`.env.example`](.env.example) for all options.
 
-### Setup Levels
-
-| Level | Keys Needed | What You Can Do |
-|-------|------------|-----------------|
-| **Demo** | None | Run all 109+ tests, explore code |
-| **Paper** | Alpaca paper + LLM | Paper trade with AI agents |
-| **Live** | Alpaca live + LLM | Real money (typed confirmation required) |
-
 ## Commands
 
 ```bash
 make help       # Show all commands
-make setup      # Install dependencies
-make test       # Run 109+ tests (no keys needed)
+make setup      # Install dependencies + pre-commit hooks
+make test       # Run 220+ tests (no keys needed)
+make test-fast  # Unit + integration only
 make paper      # Paper trading
 make scan       # Pre-market scanner
 make evaluate   # Scanner + agent evaluation
 make backtest   # CPCV backtester
-make lint       # Check code quality
+make lint       # Check code quality (ruff)
+make fmt        # Auto-format code (ruff)
 ```
 
 ## The 6 Agents
@@ -136,23 +138,13 @@ make lint       # Check code quality
 | Agent | Model Tier | Role | Key Rules |
 |-------|-----------|------|-----------|
 | **News** | T1 (DeepSeek R1) | Catalyst + sentiment | No catalyst → forced NEUTRAL |
-| **Technical** | T2 (Qwen-14B) | Breakout patterns | RVOL < 2 → NEUTRAL |
-| **Fundamental** | T2 | Float, short interest | Float > 50M → NEUTRAL |
-| **Institutional** | T2 | Options, dark pool | Single source → capped |
+| **Technical** | T2 (Qwen-14B) | Breakout patterns + VWAP | RVOL < 2 → NEUTRAL |
+| **Fundamental** | T2 | Float, short interest, SEC filings | Float > 50M → NEUTRAL; S-3/424B5 → red flag |
+| **Institutional** | T2 | Options, dark pool flow | Single source → capped |
 | **Deep Search** | T2 | SEC, social, history | Confirmation only |
 | **Risk** | T1 (DeepSeek R1) | Adversarial veto | **VETO overrides all** |
 
-## The Debate
-
-When the composite score exceeds 0.6, candidates enter structured debate:
-
-1. **Bull** builds the strongest case FOR
-2. **Bear** builds the strongest case AGAINST
-3. **Judge** weighs both + raw data → verdict
-4. **Divergence** sets position size:
-   - `> 0.6` → Full position (5% portfolio)
-   - `0.3 - 0.6` → Half position (2.5%)
-   - `< 0.3` → No trade
+Each agent has **2 prompt variants** competing in the Elo-rated Prompt Arena for continuous optimization.
 
 ## Risk Management
 
@@ -160,44 +152,32 @@ When the composite score exceeds 0.6, candidates enter structured debate:
 |-----------|------|
 | Position cap | 5% of portfolio max |
 | Stop-loss | 7% hard stop |
+| Trailing stop | ATR-based (3% default), replaces fixed stop after fill |
 | Scaled exits | +10%, +20%, +30% (⅓ each) |
 | Circuit breaker | System halts at -5% daily |
 | Time stop | Close all by 3:45 PM ET |
 | Risk veto | Deterministic rules override LLM |
+| Slippage model | Almgren-Chriss volume impact + spread + fixed costs |
 
-## Project Structure
+## Data Pipeline
 
-```
-momentum-x/
-├── config/settings.py         # Type-safe config (pydantic-settings)
-├── docs/
-│   ├── memory/                # Mind Graph (state, ontology, black box)
-│   ├── mathematics/           # Signal definitions (LaTeX)
-│   ├── research/              # Paper summaries, API constraints
-│   └── decisions/             # ADR-001 through ADR-005
-├── src/
-│   ├── agents/                # 6 agents + base + debate engine
-│   ├── core/                  # Orchestrator, scoring, backtester
-│   ├── data/                  # Alpaca client, news client
-│   ├── execution/             # Executor, position manager
-│   └── utils/                 # Rate limiter, trade filter
-├── tests/                     # 109+ tests (unit, integration, property)
-├── main.py                    # CLI: scan | evaluate | paper | backtest
-├── .env.example               # Config template (all vars documented)
-├── Makefile                   # Developer commands
-├── Dockerfile                 # Container build
-└── docker-compose.yml         # One-command deploy
-```
+| Source | Module | Purpose |
+|--------|--------|---------|
+| **Alpaca REST** | `data/alpaca_client.py` | Snapshots, historical bars, order submission |
+| **Alpaca WebSocket (SIP)** | `data/websocket_client.py` | Real-time VWAP, trade streaming, condition filtering |
+| **Alpaca Trade Updates** | `data/trade_updates.py` | Order fill detection, trailing stop management |
+| **SEC EDGAR (EFTS)** | `data/sec_client.py` | Dilution detection: S-3→WARNING, 424B5→CRITICAL |
 
 ## Testing
 
 ```bash
-make test                                    # Full suite (109+)
-make test-fast                               # Unit + integration only
-python -m pytest tests/unit/test_risk_agent.py -v  # Single file
+make test                                        # Full suite (220+)
+python -m pytest tests/unit/ -v                  # Unit only
+python -m pytest tests/property/ -v              # Property-based (Hypothesis)
+python -m pytest tests/integration/ -v           # Integration
 ```
 
-What's tested: scanner properties (Hypothesis), agent invariants, hard veto rules, debate divergence sizing, CPCV backtester, end-to-end pipeline with mocked LLMs.
+What's tested: scanner properties, agent invariants, hard veto rules, debate divergence, CPCV backtester, slippage mathematical bounds, Elo rating conservation, trade lifecycle, structured logging, end-to-end pipeline with mocked LLMs.
 
 ## Research Basis
 
@@ -205,24 +185,33 @@ What's tested: scanner properties (Hypothesis), agent invariants, hard veto rule
 |-----|-------|---------|
 | REF-001 | TradingAgents (Xiao 2024) — Sharpe 8.21 | Debate engine |
 | REF-003 | Sentiment Trading — 74.4% accuracy | News agent |
-| REF-004 | ChatGPT-Informed GNN | Technical agent |
 | REF-007 | Lopez de Prado — CPCV | Backtester |
 | REF-011 | Alpha Arena — GPT-5 lost 53% unhedged | Risk veto |
+| Almgren-Chriss | Optimal Execution of Portfolio Transactions | Slippage model |
+| Arpad Elo (1978) | The Rating of Chessplayers | Prompt Arena |
 
 Full bibliography: [`docs/research/BIBLIOGRAPHY.md`](docs/research/BIBLIOGRAPHY.md)
+
+## CI/CD
+
+GitHub Actions runs on every push and PR (Python 3.11 + 3.12 matrix):
+`ruff lint` → `ruff format --check` → `pytest` → `mypy` (non-blocking)
+
+Pre-commit hooks: secret detection, large file blocking, format enforcement.
 
 ## Roadmap
 
 - [x] Multi-agent pipeline (6 agents + debate)
 - [x] Risk agent with absolute veto
-- [x] CPCV backtester
-- [x] Alpaca REST (rate-limited, SIP)
-- [x] Trade condition filtering
-- [x] CLI + Docker
-- [ ] WebSocket streaming
-- [ ] Prompt Arena (Elo ratings)
-- [ ] SEC EDGAR client
-- [ ] Web dashboard
+- [x] CPCV backtester with slippage adjustment
+- [x] WebSocket streaming (VWAP, trade conditions)
+- [x] SEC EDGAR dilution detection
+- [x] Prompt Arena (Elo ratings, 12 variants)
+- [x] Trailing stop management (fill → stop replacement)
+- [x] Structured logging (JSON + correlation IDs)
+- [x] CI/CD (GitHub Actions + pre-commit)
+- [ ] Web dashboard (real-time trade monitoring)
+- [ ] Post-trade analysis (automatic Elo feedback)
 
 ## Contributing
 
@@ -230,7 +219,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Quick start:
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/momentum-x.git
-cd momentum-x && pip install -e ".[dev]" && make test
+cd momentum-x && pip install -e ".[dev]" && pre-commit install && make test
 ```
 
 ## Disclaimer

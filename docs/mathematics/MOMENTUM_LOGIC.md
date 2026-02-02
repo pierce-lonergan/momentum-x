@@ -273,3 +273,51 @@ $$
 Where $K = 32$ (standard provisional), $S_A \in \{0, 0.5, 1\}$.
 
 **Reference**: Arpad Elo (1978); LMSYS Chatbot Arena methodology
+
+---
+
+## 13. Trailing Stop Management (ADR-007)
+
+Resolves H-008: Bracket orders cannot use trailing_stop legs.
+
+### 13.1 Trailing Stop Price
+
+$$
+p_{trail}(t) = p_{high}(t) \cdot (1 - \delta_{trail})
+$$
+
+Where $p_{high}(t)$ is the running high-water mark since entry, and
+$\delta_{trail}$ is the trailing percent (typically 3% from ATR-based config).
+
+### 13.2 State Machine
+
+$$
+\text{PENDING\_FILL} \xrightarrow{\text{entry fill}} \text{CANCELING\_STOP} \xrightarrow{\text{stop canceled}} \text{TRAILING\_ACTIVE} \xrightarrow{\text{trail triggers}} \text{CLOSED}
+$$
+
+### 13.3 Safety Invariant
+
+At all times before $\text{TRAILING\_ACTIVE}$, the original bracket stop-loss
+$p_{stop}$ remains active. If WebSocket disconnects:
+
+$$
+\text{fallback\_protection} = p_{stop} \quad \text{(bracket leg, server-side)}
+$$
+
+---
+
+## 14. Trade Correlation ID (ADR-008)
+
+### 14.1 ID Format
+
+$$
+\text{trade\_id} = \text{UUID4}_{[0:8]} \| \text{-} \| \text{TICKER}
+$$
+
+Example: `a1b2c3d4-AAPL`
+
+### 14.2 Propagation
+
+Correlation ID propagates via `contextvars.ContextVar` across all async
+pipeline stages, enabling full trade lifecycle tracing in structured JSON logs.
+
