@@ -1,35 +1,36 @@
 {
-    "session": "S013",
-    "timestamp": "2026-02-02T11:00:00Z",
-    "state_reconstruction": "Resuming from S012 research recording. All 3 PLANNED nodes (analysis.shapley, core.llm_leakage, scanner.gex) now COMPLETE with full TDD coverage. 359 tests passing. Graph: 24 nodes all COMPLETE, 12 ADRs, §1-§19 formalized.",
+    "session": "S015",
+    "timestamp": "2026-02-02T13:00:00Z",
+    "state_reconstruction": "Resuming from S014 integration wiring. Pipeline feedback loop is now CLOSED: scan → agents → score → debate → trade → shapley attribution → elo update. All integration debt P1-P3 resolved. 391 tests passing. 27 nodes, 14 ADRs, §1-§19.",
     "completed_this_session": [
-        "IMPLEMENTED analysis.shapley (21 tests): ShapleyAttributor with exact 2^6 coalition enumeration, threshold_aware + proportional characteristic functions, Shapley-to-Elo sigmoid conversion, EnrichedTradeResult dataclass",
-        "VERIFIED 4 Shapley axioms: Efficiency (Σφ=v(N)-v(∅)), Symmetry (identical→equal), Null Player (zero→0), Additivity (linear decomposition)",
-        "DISCOVERED v(∅)=0 invariant bug: threshold=0 caused v(∅)=pnl → fixed with explicit empty coalition gate",
-        "DISCOVERED threshold unanimity game: threshold=0 makes all non-empty v(S)=pnl → added 'proportional' mode for linear attribution",
-        "IMPLEMENTED core.llm_leakage (27 tests): KnowledgeCutoffRegistry (Qwen/DeepSeek/GPT-4o/Claude cutoffs), LeakageDetector (contamination check, LLM-aware embargo), CounterfactualSimulator (IDS metric), CachedAgentWrapper (deterministic replay)",
-        "IMPLEMENTED scanner.gex (23 tests): GEXCalculator (naive model D_call=+1,D_put=-1), GEXResult, OptionsChainEntry, SyntheticOptionsProvider, GEXRegime enum, gamma flip grid search, regime classification, <500ms benchmark verified"
+        "IMPLEMENTED Orchestrator.build_enriched_trade_result(): Constructs EnrichedTradeResult from ScoredCandidate + exit data. Captures component_scores, mfcs_at_entry, variant_map for Shapley attribution.",
+        "IMPLEMENTED Orchestrator GEX forwarding: _dispatch_agents() forwards CandidateStock.gex_* fields to InstitutionalAgent via gex_data kwarg. Conditional on gex_net != None.",
+        "IMPLEMENTED InstitutionalAgent GEX prompt: build_user_prompt() includes GAMMA EXPOSURE section with regime-specific constraints. SUPPRESSION → caps confidence, ACCELERATION → supports aggressive positioning.",
+        "VERIFIED end-to-end Shapley loop: scored→enriched→attributor→elo_update for both winning and losing trades. Elo changes confirmed.",
+        "VERIFIED DSR properties: monotone in SR, monotone decreasing in N, bounded [0,1] across 100 random param combos.",
+        "VERIFIED GEX filter integration: scan → gex_filter → reject extreme positive → institutional agent receives context.",
+        "CREATED ADR-014: Pipeline Closure documenting all integration decisions.",
+        "13 new tests (3 orchestrator enrichment + 2 scanner GEX + 3 institutional GEX + 2 end-to-end + 3 DSR properties)"
     ],
     "next_action": {
-        "priority_1": "WIRE integration: ShapleyAttributor into PostTradeAnalyzer.analyze() — replace binary is_signal_aligned() with Shapley-based Elo updates. Requires adding agent_component_scores to trade pipeline.",
-        "priority_2": "WIRE integration: GEXCalculator into scan_premarket_gappers() — add hard filter gate for extreme positive GEX and soft signal to InstitutionalAgent prompt.",
-        "priority_3": "WIRE integration: LeakageDetector + CachedAgentWrapper into BacktestRunner — add contamination checks per fold, response caching for deterministic replay.",
-        "priority_4": "IMPLEMENT BacktestMetrics: DSR and PBO computation per §18.4-§18.5 formulas."
+        "priority_1": "IMPLEMENT OptionsDataProvider concrete: AlpacaOptionsProvider using existing alpaca_client. Needs Alpaca options API endpoint mapping.",
+        "priority_2": "IMPLEMENT position_manager trade close hook: Cache ScoredCandidate at entry, call build_enriched_trade_result() at close, trigger analyze_with_shapley().",
+        "priority_3": "IMPLEMENT PBO+DSR combined gate: Strategy acceptance requires PBO < 0.10 AND DSR > 0.95.",
+        "priority_4": "IMPLEMENT live scan loop: CLI command that runs scan_premarket_gappers() → GEX enrichment → filter → evaluate_candidates() in a polling loop.",
+        "priority_5": "STRESS TEST: Generate synthetic 1000-trade histories, verify Shapley Elo converges to correct agent ranking."
     },
     "cognitive_load": {
-        "shapley_key_insight": "Two characteristic function modes: 'threshold_aware' (weighted majority game, pivotality-based attribution) and 'proportional' (linear, score-proportional attribution). The threshold mode creates non-intuitive attribution near τ=0.6 where pivotal agents get credit regardless of score magnitude. The proportional mode gives clean linear decomposition. Both satisfy all 4 axioms.",
-        "llm_leakage_key_insight": "Knowledge cutoff registry covers Qwen(Sep 2024), DeepSeek(Jul 2024), GPT-4o(Apr 2024), Claude(Mar 2025). Buffer of 30 days. LLM-aware embargo: e_LLM = max(e_standard, t_cutoff + buffer - t_test_end). IDS threshold: 0.8 (auto-reject below). CachedAgentWrapper uses SHA256 prompt hashing for deterministic replay.",
-        "gex_key_insight": "Naive model: D_call=+1, D_put=-1. Normalization: GEX/(ADV×S). Regime thresholds: >0.05 SUPPRESSION, <-0.01 ACCELERATION. Gamma flip via grid search with linear interpolation across S±20%. SyntheticOptionsProvider generates realistic chains with ATM-peaked gamma and moneyness-decayed OI."
+        "feedback_loop_architecture": "Full loop closed: Orchestrator captures ScoredCandidate (entry) → builds EnrichedTradeResult (exit) → PostTradeAnalyzer.analyze_with_shapley() → Shapley φ values → sigmoid → Elo update. Agent-to-category mapping via _AGENT_TO_CATEGORY dict.",
+        "gex_data_flow": "CandidateStock.gex_* fields → Orchestrator._dispatch_agents() conditional forwarding → InstitutionalAgent.build_user_prompt(gex_data=dict) → Prompt with GAMMA EXPOSURE section + regime constraints.",
+        "dsr_property_guarantees": "DSR monotone in SR (verified 7 points), monotone decreasing in N (verified 6 points), bounded [0,1] (verified 100 random combos). Approximation uses Abramowitz-Stegun 26.2.23 for probit."
     },
-    "test_count": 359,
+    "test_count": 391,
     "unresolved_debt": [
-        "PostTradeAnalyzer.analyze() still uses binary is_signal_aligned() — needs Shapley wiring",
-        "scan_premarket_gappers() lacks GEX filter gate — needs GEXCalculator integration",
-        "BacktestRunner lacks LeakageDetector + CachedAgentWrapper hooks",
-        "BacktestMetrics class needs DSR and PBO implementations (formulas in §18.4-18.5)",
-        "CandidateStock model needs gex_net, gex_normalized, gamma_flip_price fields",
-        "InstitutionalAgent prompt needs GEX data injection point",
-        "EnrichedTradeResult needs to be constructed from actual orchestrator pipeline data",
-        "OptionsDataProvider needs concrete Polygon.io / Alpaca implementations"
+        "OptionsDataProvider needs Alpaca/Polygon concrete implementation",
+        "Position manager needs ScoredCandidate cache + build_enriched_trade_result() close hook",
+        "PBO + DSR combined gate not yet implemented as single acceptance function",
+        "Live scan loop CLI command not yet built",
+        "Shapley Elo convergence stress test not yet run",
+        "Normal PPF uses approximation (±0.00045) — acceptable for 95% threshold"
     ]
 }

@@ -437,6 +437,16 @@ class Orchestrator:
                 options_data={},
                 dark_pool_data={},
                 insider_trades=[],
+                gex_data=(
+                    {
+                        "gex_net": candidate.gex_net,
+                        "gex_normalized": candidate.gex_normalized,
+                        "gamma_flip_price": candidate.gamma_flip_price,
+                        "gex_regime": candidate.gex_regime,
+                    }
+                    if candidate.gex_net is not None
+                    else None
+                ),
             ),
             self._deep_search_agent.analyze(
                 ticker=candidate.ticker,
@@ -552,4 +562,51 @@ class Orchestrator:
             target_prices=[],
             position_size_pct=0.0,
             reasoning_summary=reason,
+        )
+
+    def build_enriched_trade_result(
+        self,
+        scored: ScoredCandidate,
+        agent_signals_map: dict[str, str],
+        variant_map: dict[str, str],
+        exit_price: float,
+        exit_time: datetime,
+    ) -> Any:
+        """
+        Construct an EnrichedTradeResult from pipeline data for Shapley attribution.
+
+        Called post-trade when position is closed. Captures all the data
+        needed by ShapleyAttributor.compute_attributions():
+          - agent_component_scores from MFCS computation
+          - mfcs_at_entry (the composite score at time of entry)
+          - agent_variants and agent_signals for Elo feedback
+          - debate_triggered flag
+
+        Args:
+            scored: ScoredCandidate from MFCS computation at entry time.
+            agent_signals_map: Map of agent_id → signal direction string.
+            variant_map: Map of agent_id → variant_id from arena selection.
+            exit_price: Final exit fill price.
+            exit_time: When position was closed.
+
+        Returns:
+            EnrichedTradeResult ready for ShapleyAttributor.
+
+        Ref: ADR-013 (D1: Shapley → PostTradeAnalyzer)
+        Ref: MOMENTUM_LOGIC.md §17 (Shapley Attribution)
+        """
+        from src.analysis.shapley import EnrichedTradeResult
+
+        return EnrichedTradeResult(
+            ticker=scored.candidate.ticker,
+            entry_price=scored.candidate.current_price,
+            exit_price=exit_price,
+            entry_time=scored.candidate.scan_timestamp,
+            exit_time=exit_time,
+            agent_variants=variant_map,
+            agent_signals=agent_signals_map,
+            agent_component_scores=dict(scored.component_scores),
+            mfcs_at_entry=scored.mfcs,
+            risk_score=scored.risk_score,
+            debate_triggered=scored.qualifies_for_debate,
         )

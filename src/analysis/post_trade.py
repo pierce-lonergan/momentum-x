@@ -43,6 +43,24 @@ from src.agents.prompt_arena import PromptArena
 
 logger = logging.getLogger(__name__)
 
+# Map agent_id patterns → MFCS weight categories (for Shapley lookup)
+_AGENT_TO_CATEGORY: dict[str, str] = {
+    "news": "catalyst_news",
+    "catalyst": "catalyst_news",
+    "tech": "technical",
+    "volume": "volume_rvol",
+    "rvol": "volume_rvol",
+    "scanner": "volume_rvol",
+    "float": "float_structure",
+    "fund": "float_structure",
+    "fundamental": "float_structure",
+    "inst": "institutional",
+    "option": "institutional",
+    "deep": "deep_search",
+    "search": "deep_search",
+    "risk": "risk",
+}
+
 
 # ── Trade Result ─────────────────────────────────────────────
 
@@ -243,6 +261,89 @@ class PostTradeAnalyzer:
             for v in variants:
                 summary[v.variant_id] = v.elo_rating
         return summary
+
+    def analyze_with_shapley(
+        self,
+        enriched: Any,
+        attributor: Any,
+    ) -> list[dict[str, str]]:
+        """
+        Analyze a trade using Shapley attribution instead of binary alignment.
+
+        Replaces is_signal_aligned() with fair credit assignment per ADR-010.
+        Each agent's Elo update uses its Shapley-derived actual score (0–1)
+        instead of binary 1.0/0.0.
+
+        Args:
+            enriched: EnrichedTradeResult with agent_component_scores.
+            attributor: ShapleyAttributor instance.
+
+        Returns:
+            List of matchup dicts with Shapley scores.
+
+        Ref: ADR-010, MOMENTUM_LOGIC.md §17
+        """
+        from src.analysis.shapley import EnrichedTradeResult, ShapleyAttributor
+        from src.agents.prompt_arena import compute_expected_score, update_elo
+
+        attribution = attributor.compute_attributions(enriched)
+        elo_scores = attributor.shapley_to_elo_scores(attribution)
+
+        matchups: list[dict[str, str]] = []
+
+        for agent_id, variant_id in enriched.agent_variants.items():
+            # Map agent_id → weight category for Shapley lookup
+            category = self._agent_id_to_category(agent_id)
+            shapley_score = elo_scores.get(category, 0.5)
+
+            # Find opponent variant
+            opponent_id = self._find_opponent(agent_id, variant_id)
+            if opponent_id is None:
+                continue
+
+            # Use Shapley score as actual score in Elo update
+            # shapley_score > 0.5 → agent contributed positively → wins
+            # shapley_score < 0.5 → agent contributed negatively → loses
+            try:
+                winner = self._arena._variants[variant_id]
+                loser = self._arena._variants[opponent_id]
+
+                e_w = compute_expected_score(winner.elo_rating, loser.elo_rating)
+                e_l = compute_expected_score(loser.elo_rating, winner.elo_rating)
+
+                # Apply Shapley-weighted Elo update
+                winner.elo_rating = update_elo(winner.elo_rating, e_w, shapley_score)
+                loser.elo_rating = update_elo(loser.elo_rating, e_l, 1.0 - shapley_score)
+                winner.match_count += 1
+                loser.match_count += 1
+                if shapley_score > 0.5:
+                    winner.win_count += 1
+
+                matchups.append({
+                    "agent": agent_id,
+                    "winner": variant_id,
+                    "loser": opponent_id,
+                    "shapley_score": f"{shapley_score:.4f}",
+                    "pnl": f"{enriched.pnl_pct:.4f}",
+                    "category": category,
+                })
+                logger.info(
+                    "Shapley Elo update: %s → score=%.4f (category=%s, pnl=%.2f%%)",
+                    agent_id, shapley_score, category, enriched.pnl_pct * 100,
+                )
+            except Exception as e:
+                logger.warning("Failed Shapley Elo for %s: %s", agent_id, e)
+
+        return matchups
+
+    @staticmethod
+    def _agent_id_to_category(agent_id: str) -> str:
+        """Map agent_id to MFCS weight category for Shapley lookup."""
+        agent_lower = agent_id.lower()
+        for pattern, category in _AGENT_TO_CATEGORY.items():
+            if pattern in agent_lower:
+                return category
+        return "unknown"
 
     def _find_opponent(self, agent_id: str, active_variant_id: str) -> str | None:
         """

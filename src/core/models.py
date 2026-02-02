@@ -79,6 +79,22 @@ class CandidateStock(BaseModel, frozen=True):
     scan_timestamp: datetime
     scan_phase: Literal["PRE_MARKET", "MARKET_OPEN", "INTRADAY", "AFTER_HOURS"]
 
+    # ── GEX Fields (ADR-012, §19) ──
+    # Populated by GEXCalculator when options data is available.
+    # All optional for backward compatibility.
+    gex_net: float | None = Field(
+        default=None, description="Net dollar GEX. §19.2"
+    )
+    gex_normalized: float | None = Field(
+        default=None, description="GEX / (ADV × Spot). §19.3"
+    )
+    gamma_flip_price: float | None = Field(
+        default=None, description="Gamma zero-crossing price. §19.4"
+    )
+    gex_regime: str | None = Field(
+        default=None, description="SUPPRESSION / NEUTRAL / ACCELERATION. §19.5"
+    )
+
 
 # ─── Agent Outputs ───────────────────────────────────────────────────
 

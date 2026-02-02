@@ -63,13 +63,52 @@ class InstitutionalAgent(BaseAgent):
         dark_pool = kwargs.get("dark_pool_data", {})
         insider_trades = kwargs.get("insider_trades", [])
         rvol = kwargs.get("rvol", 0)
+        gex_data = kwargs.get("gex_data", None)
+
+        # ── GEX Context Section (ADR-012 §19, soft signal) ──
+        gex_section = ""
+        if gex_data and isinstance(gex_data, dict):
+            gex_net = gex_data.get("gex_net", "N/A")
+            gex_norm = gex_data.get("gex_normalized", "N/A")
+            flip = gex_data.get("gamma_flip_price", "N/A")
+            regime = gex_data.get("gex_regime", "UNKNOWN")
+
+            gex_section = (
+                f"\n--- GAMMA EXPOSURE (GEX) ---\n"
+                f"  Net GEX: ${gex_net:,.0f}\n" if isinstance(gex_net, (int, float)) else
+                f"\n--- GAMMA EXPOSURE (GEX) ---\n"
+                f"  Net GEX: {gex_net}\n"
+            )
+            gex_section = (
+                f"\n--- GAMMA EXPOSURE (GEX) ---\n"
+                f"  Net GEX: {gex_net}\n"
+                f"  Normalized GEX: {gex_norm}\n"
+                f"  Gamma Flip Price: {flip}\n"
+                f"  Regime: {regime}\n"
+            )
+
+            # Add regime-specific constraint
+            if regime == "SUPPRESSION":
+                gex_section += (
+                    "  ⚠️ SUPPRESSION regime: Dealers are long gamma and will sell "
+                    "into rallies. Momentum breakouts face resistance. Factor this "
+                    "into your signal assessment — cap confidence if relying on "
+                    "breakout thesis.\n"
+                )
+            elif regime == "ACCELERATION":
+                gex_section += (
+                    "  🟢 ACCELERATION regime: Dealers are short gamma and will "
+                    "amplify moves. Momentum breakouts have tailwind. This supports "
+                    "aggressive positioning if other signals align.\n"
+                )
 
         return (
             f"Analyze institutional flow for {ticker}:\n\n"
             f"Equity RVOL: {rvol:.1f}x\n\n"
             f"--- OPTIONS ACTIVITY ---\n{_format_dict(options_data)}\n\n"
             f"--- DARK POOL ---\n{_format_dict(dark_pool)}\n\n"
-            f"--- INSIDER TRADES (Form 4) ---\n{_format_list(insider_trades)}\n\n"
+            f"--- INSIDER TRADES (Form 4) ---\n{_format_list(insider_trades)}\n"
+            f"{gex_section}\n"
             f"Provide your analysis as JSON:\n"
             f'{{\n'
             f'  "signal": "STRONG_BULL" | "BULL" | "NEUTRAL" | "BEAR" | "STRONG_BEAR",\n'
