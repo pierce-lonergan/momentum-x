@@ -69,9 +69,11 @@ class Orchestrator:
         self,
         settings: Settings,
         websocket_client: Any | None = None,
+        sec_client: Any | None = None,
     ) -> None:
         self._settings = settings
         self._ws_client = websocket_client  # H-006: Real VWAP from streaming
+        self._sec_client = sec_client  # H-004: SEC EDGAR dilution detection
 
         # ── Initialize agents per ADR-001 Model Tiering ──
         # Tier 1 (DeepSeek R1-32B): Reasoning-heavy agents
@@ -147,11 +149,16 @@ class Orchestrator:
         )
 
         # ── Phase 1: Parallel Agent Dispatch ──
+        # Auto-query SEC if client available and no filings provided
+        effective_sec = sec_filings or {}
+        if not effective_sec and self._sec_client is not None:
+            effective_sec = await self._fetch_sec_filings(ticker)
+
         agent_signals = await self._dispatch_agents(
             candidate=candidate,
             news_items=news_items or [],
             market_data=market_data or {},
-            sec_filings=sec_filings or {},
+            sec_filings=effective_sec,
         )
 
         # ── Phase 2: MFCS Scoring (pure math, no LLM) ──
@@ -243,6 +250,35 @@ class Orchestrator:
         return verdicts
 
     # ── Private Methods ──────────────────────────────────────────────
+
+    async def _fetch_sec_filings(self, ticker: str) -> dict[str, Any]:
+        """
+        Auto-query SEC EDGAR for recent filings when SEC client is available.
+
+        Converts Filing objects to the dict format expected by fundamental agent:
+        {"filings": [{"form": "S-3", "description": "...", "date": "2026-01-15"}]}
+
+        H-004 RESOLUTION: Live SEC data feeds into fundamental agent pipeline.
+        """
+        try:
+            filings = await self._sec_client.search_filings(
+                ticker=ticker,
+                form_types=["S-3", "S-3/A", "424B5", "8-K", "4", "10-K", "10-Q"],
+                days_back=90,
+            )
+            return {
+                "filings": [
+                    {
+                        "form": f.form_type,
+                        "description": f.description,
+                        "date": str(f.filed_date),
+                    }
+                    for f in filings[:10]  # Cap at 10 most recent
+                ]
+            }
+        except Exception as e:
+            logger.warning("SEC filing fetch failed for %s: %s", ticker, e)
+            return {}
 
     def _get_vwap(self, ticker: str, fallback_price: float) -> float:
         """

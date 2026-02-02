@@ -194,6 +194,7 @@ class BacktestRunner:
         n_test_groups: int = 2,
         purge_window: int = 5,
         embargo_pct: float = 0.01,
+        slippage_model: Any | None = None,
     ) -> None:
         self.splitter = CPCVSplitter(
             n_groups=n_groups,
@@ -201,6 +202,7 @@ class BacktestRunner:
             purge_window=purge_window,
             embargo_pct=embargo_pct,
         )
+        self._slippage = slippage_model  # H-009: Synthetic execution costs
 
     def run(
         self,
@@ -225,6 +227,21 @@ class BacktestRunner:
         # Convert signals to position vector: BUY → 1, else → 0
         positions = np.array([1.0 if s == "BUY" else 0.0 for s in signals])
 
+        # H-009: Apply slippage cost to returns (reduces PnL for realistic simulation)
+        adjusted_returns = returns.copy()
+        if self._slippage is not None:
+            slippage_cost = self._slippage.estimate(
+                price=100.0,  # Normalized price for percentage-based adjustment
+                order_shares=1000,  # Typical order size
+                daily_volume=500_000,  # Conservative avg volume
+                volatility=0.05,  # 5% daily vol typical for momentum stocks
+            ).slippage_pct
+            # Subtract round-trip slippage from each trade's return
+            trade_mask = positions > 0
+            adjusted_returns[trade_mask] -= 2 * slippage_cost  # Entry + exit
+        else:
+            adjusted_returns = returns
+
         is_sharpes: list[float] = []
         oos_sharpes: list[float] = []
 
@@ -232,12 +249,12 @@ class BacktestRunner:
 
         for train_idx, test_idx in paths:
             # In-sample: strategy returns on train set
-            train_returns = positions[train_idx] * returns[train_idx]
+            train_returns = positions[train_idx] * adjusted_returns[train_idx]
             is_sharpe = self._compute_sharpe(train_returns)
             is_sharpes.append(is_sharpe)
 
             # Out-of-sample: strategy returns on test set
-            test_returns = positions[test_idx] * returns[test_idx]
+            test_returns = positions[test_idx] * adjusted_returns[test_idx]
             oos_sharpe = self._compute_sharpe(test_returns)
             oos_sharpes.append(oos_sharpe)
 
