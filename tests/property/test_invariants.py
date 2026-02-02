@@ -189,3 +189,42 @@ class TestEloInvariants:
             assert e_a > 0.5
         else:
             assert e_a < 0.5
+
+
+# ── Signal Alignment Invariants ──────────────────────────────
+
+class TestSignalAlignmentInvariants:
+    """
+    Property-based tests for post-trade signal alignment.
+
+    Ref: docs/research/POST_TRADE_ANALYSIS.md
+    """
+
+    @given(pnl=st.floats(min_value=0.01, max_value=1000, allow_nan=False))
+    def test_bullish_always_aligned_on_win(self, pnl):
+        """INV: STRONG_BULL and BULL are always aligned with positive P&L."""
+        from src.analysis.post_trade import is_signal_aligned
+        assert is_signal_aligned("STRONG_BULL", pnl) is True
+        assert is_signal_aligned("BULL", pnl) is True
+
+    @given(pnl=st.floats(min_value=-1000, max_value=0.0, allow_nan=False))
+    def test_bearish_always_aligned_on_loss(self, pnl):
+        """INV: BEAR, STRONG_BEAR, NEUTRAL are aligned with non-positive P&L."""
+        from src.analysis.post_trade import is_signal_aligned
+        assert is_signal_aligned("BEAR", pnl) is True
+        assert is_signal_aligned("STRONG_BEAR", pnl) is True
+        assert is_signal_aligned("NEUTRAL", pnl) is True
+
+    @given(pnl=st.floats(min_value=0.01, max_value=1000, allow_nan=False))
+    def test_bearish_never_aligned_on_win(self, pnl):
+        """INV: Bearish signals are never aligned with positive P&L."""
+        from src.analysis.post_trade import is_signal_aligned
+        assert is_signal_aligned("BEAR", pnl) is False
+        assert is_signal_aligned("STRONG_BEAR", pnl) is False
+
+    @given(pnl=st.floats(min_value=-1000, max_value=-0.01, allow_nan=False))
+    def test_bullish_never_aligned_on_loss(self, pnl):
+        """INV: Bullish signals are never aligned with negative P&L."""
+        from src.analysis.post_trade import is_signal_aligned
+        assert is_signal_aligned("STRONG_BULL", pnl) is False
+        assert is_signal_aligned("BULL", pnl) is False

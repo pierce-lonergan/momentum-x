@@ -1,76 +1,72 @@
 {
   "protocol": "TOR-P",
-  "session_id": "S008_LIVE_WIRING_OBSERVABILITY",
-  "timestamp": "2026-02-02T07:00:00Z",
+  "session_id": "S010_CLI_WIRING_LOGGING_RESEARCH",
+  "timestamp": "2026-02-02T09:00:00Z",
 
   "resumption_vector": {
     "completed_this_session": [
-      "ADR-008: Structured Logging and Observability",
-      "Structured logging module (utils.trade_logger): TradeContext, JsonFormatter, correlation IDs via contextvars",
-      "TradeUpdatesStream: WebSocket class connecting to Alpaca trade_updates, dispatching to TrailingStopManager",
-      "PromptArena wired into orchestrator: _get_best_prompt() for live Elo-rated variant selection",
-      "Research doc: Arena Live Selection Strategy (hot path read-only, feedback deferred)",
-      "Mathematics §13 (Trailing Stop) and §14 (Trade Correlation ID) formalized",
-      "README.md comprehensive rewrite reflecting all S001-S008 features",
-      "28 new tests (248 total, all passing, ZERO warnings)"
+      "ADR-009: Post-Trade Feedback Loop decision record",
+      "MOMENTUM_LOGIC.md §15: Elo Feedback Dynamics (alignment function, matchup, convergence bound)",
+      "MOMENTUM_LOGIC.md §16: Agent Structured Logging Schema (event structure, observability invariant)",
+      "CLI wiring: cmd_analyze() loads closed trades → PostTradeAnalyzer → Elo updates → arena save",
+      "Makefile: 'make analyze' and 'make arena-seed' commands",
+      "Agent logging migration: all 7 modules (base + 6 agents) now use get_trade_logger",
+      "12 new tests (288 total, all passing, ZERO warnings)",
+      "3 deep research prompts for project enhancement"
     ],
     "immediate_next": {
-      "file": "src/core/orchestrator.py",
-      "task": "Wire TradeContext into orchestrator.evaluate_candidate() — set_trade_context at start, clear at end, propagate trade_id through all agent calls"
+      "file": "src/execution/position_manager.py",
+      "task": "Implement closed_trades.json serialization — PositionManager.save_closed_trades() to write TradeResult-compatible JSON for cmd_analyze consumption."
     },
     "secondary_targets": [
-      "Wire _get_best_prompt into _dispatch_agents for actual prompt override during agent.analyze()",
-      "Add make arena command to run prompt tournament manually",
-      "Post-trade analysis module for automatic Elo feedback",
-      "Web dashboard (Flask/FastAPI + htmx) for trade monitoring",
-      "GitHub release workflow (tag → build → publish PyPI)",
-      "Performance profiling: orchestrator latency breakdown per agent"
+      "Web dashboard (Flask/FastAPI + htmx) for real-time trade monitoring",
+      "Performance profiling: orchestrator latency breakdown per agent",
+      "Shapley value-based agent attribution (ADR-009 Alternative #3)",
+      "CPCV backtester integration with arena variants",
+      "Multi-strategy support (mean reversion, gap fill patterns)"
     ]
   },
 
   "unresolved_hypotheses": {
     "H-001": {"status": "RESOLVED"},
-    "H-002": {"status": "OPEN", "statement": "R1 JSON reliability", "blocking": "Live LLM integration test with real API key"},
-    "H-003": {"status": "RESOLVED", "resolution": "PromptArena + 12 variants + orchestrator._get_best_prompt()"},
+    "H-002": {"status": "OPEN", "statement": "R1 JSON reliability — needs live LLM API key"},
+    "H-003": {"status": "RESOLVED"},
     "H-004": {"status": "RESOLVED"},
     "H-005": {"status": "RESOLVED"},
     "H-006": {"status": "RESOLVED"},
     "H-007": {"status": "RESOLVED"},
-    "H-008": {"status": "RESOLVED", "resolution": "TrailingStopManager + TradeUpdatesStream fully wired"},
+    "H-008": {"status": "RESOLVED"},
     "H-009": {"status": "RESOLVED"}
   },
 
   "cognitive_load": {
     "critical_context": [
-      "248 TESTS, ZERO WARNINGS across 23 test files.",
-      "8 of 9 hypotheses RESOLVED. Only H-002 (R1 JSON, needs live API key) remains.",
-      "8 ADRs document all architectural decisions.",
-      "Orchestrator now accepts 4 optional deps: websocket_client, sec_client, prompt_arena, (logging auto-available).",
-      "TradeUpdatesStream is a separate WebSocket client for order events, dispatching to TrailingStopManager.",
-      "JsonFormatter + TradeContext provide full trade lifecycle tracing.",
-      "README fully updated with architecture diagrams, test counts, feature matrix.",
-      "All modules have TOR-P Node IDs, research references, and architectural docstrings."
+      "288 TESTS, ZERO WARNINGS across 26 test files.",
+      "9 ADRs, 6 research docs, 16 math sections.",
+      "FULL CLOSED LOOP: agents → signals → orchestrator → trade → PostTradeAnalyzer → Elo → arena → agents",
+      "All 7 agent modules now use structured trade_logger with async-safe TradeContext.",
+      "CLI has 5 commands: scan, evaluate, paper, backtest, analyze.",
+      "Missing piece: PositionManager needs to serialize closed trades to data/closed_trades.json."
     ],
     "architectural_debt": [
-      "H-002: R1 JSON reliability — needs live LLM API key to test",
-      "TradeContext not yet set/cleared in orchestrator.evaluate_candidate()",
-      "_get_best_prompt() not yet called in _dispatch_agents (read-only wiring ready, not in hot path)",
+      "H-002: R1 JSON reliability — needs live LLM API key",
+      "PositionManager does not yet serialize closed trades for cmd_analyze",
       "No web dashboard for trade monitoring",
-      "No post-trade analysis for automatic Elo feedback",
-      "MyPy runs in non-blocking mode (stubs needed for strict)"
+      "MyPy runs in non-blocking mode",
+      "Debate engine not yet using trade_logger"
     ]
   },
 
   "test_state": {
-    "total": 248,
-    "passing": 248,
+    "total": 288,
+    "passing": 288,
     "failing": 0,
     "warnings": 0,
     "suites": {
       "tests/integration/test_pipeline.py": 2,
-      "tests/integration/test_wiring.py": 5,
+      "tests/integration/test_wiring.py": 6,
       "tests/property/test_scanner_properties.py": 19,
-      "tests/property/test_invariants.py": 13,
+      "tests/property/test_invariants.py": 17,
       "tests/unit/test_scoring.py": 9,
       "tests/unit/test_alpaca_client.py": 6,
       "tests/unit/test_news_agent.py": 7,
@@ -89,22 +85,10 @@
       "tests/unit/test_default_variants.py": 7,
       "tests/unit/test_logging.py": 15,
       "tests/unit/test_trade_updates_stream.py": 8,
-      "tests/unit/test_arena_wiring.py": 5
+      "tests/unit/test_arena_wiring.py": 5,
+      "tests/unit/test_orchestrator_context.py": 5,
+      "tests/unit/test_post_trade.py": 18,
+      "tests/unit/test_cli_analyze.py": 12
     }
-  },
-
-  "files_created_this_session": [
-    "docs/decisions/ADR_008_STRUCTURED_LOGGING.md",
-    "docs/research/ARENA_LIVE_SELECTION.md",
-    "src/utils/trade_logger.py",
-    "tests/unit/test_logging.py",
-    "tests/unit/test_trade_updates_stream.py",
-    "tests/unit/test_arena_wiring.py"
-  ],
-  "files_modified_this_session": [
-    "src/data/websocket_client.py (TradeUpdatesStream class added)",
-    "src/core/orchestrator.py (prompt_arena dep, _get_best_prompt method)",
-    "docs/mathematics/MOMENTUM_LOGIC.md (§13 Trailing Stop, §14 Correlation ID)",
-    "README.md (comprehensive rewrite)"
-  ]
+  }
 }

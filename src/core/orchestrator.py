@@ -33,6 +33,13 @@ from src.core.models import (
     ScoredCandidate,
     TradeVerdict,
 )
+from src.utils.trade_logger import (
+    TradeContext,
+    generate_trade_id,
+    get_trade_logger,
+    set_trade_context,
+    clear_trade_context,
+)
 from src.core.scoring import compute_mfcs
 from src.agents.base import BaseAgent
 from src.agents.news_agent import NewsAgent
@@ -76,6 +83,7 @@ class Orchestrator:
         self._ws_client = websocket_client  # H-006: Real VWAP from streaming
         self._sec_client = sec_client  # H-004: SEC EDGAR dilution detection
         self._prompt_arena = prompt_arena  # H-003: Elo-rated prompt selection
+        self._last_variant_map: dict[str, str] = {}  # Track arena selections per trade
 
         # ── Initialize agents per ADR-001 Model Tiering ──
         # Tier 1 (DeepSeek R1-32B): Reasoning-heavy agents
@@ -143,6 +151,40 @@ class Orchestrator:
         Ref: SYSTEM_ARCHITECTURE.md (Data Flow)
         """
         pipeline_start = time.monotonic()
+        ticker = candidate.ticker
+
+        # ── Trade Context (ADR-008): Correlation ID for full pipeline tracing ──
+        trade_id = generate_trade_id(ticker)
+        ctx = TradeContext(trade_id=trade_id, ticker=ticker, phase="EVALUATION")
+        set_trade_context(ctx)
+
+        try:
+            return await self._evaluate_candidate_inner(
+                candidate=candidate,
+                news_items=news_items,
+                market_data=market_data,
+                sec_filings=sec_filings,
+                pipeline_start=pipeline_start,
+                trade_id=trade_id,
+            )
+        finally:
+            clear_trade_context()
+
+    async def _evaluate_candidate_inner(
+        self,
+        candidate: CandidateStock,
+        news_items: list | None,
+        market_data: dict[str, Any] | None,
+        sec_filings: dict[str, Any] | None,
+        pipeline_start: float,
+        trade_id: str,
+    ) -> TradeVerdict:
+        """
+        Inner evaluation logic — separated for clean TradeContext lifecycle.
+
+        TradeContext is set by evaluate_candidate() and cleared in its finally block.
+        All logging within this method automatically includes trade_id.
+        """
         ticker = candidate.ticker
 
         logger.info(
@@ -335,13 +377,34 @@ class Orchestrator:
         sec_filings: dict,
     ) -> list[AgentSignal]:
         """
-        Two-phase agent dispatch (H-007 fix), now with ALL 6 agents:
+        Two-phase agent dispatch (H-007 fix), now with ALL 6 agents + arena selection.
         Phase A: 5 analytical agents in parallel (news, technical, fundamental, institutional, deep_search)
         Phase B: Risk agent receives Phase A results for informed adversarial assessment
+
+        Arena Integration (H-003): If PromptArena is available, selects best Elo-rated
+        variant for each agent. Variant IDs are tracked in _last_variant_map for
+        post-trade Elo feedback.
 
         Ref: ADR-001 (Parallel fan-out, <90s budget)
         Resolution: H-007 (risk agent was receiving empty candidate_signals)
         """
+        # ── Arena variant selection (H-003) ──
+        agent_ids = [
+            "news_agent", "technical_agent", "fundamental_agent",
+            "institutional_agent", "deep_search_agent",
+        ]
+        variant_map: dict[str, str] = {}
+        for aid in agent_ids:
+            prompt = self._get_best_prompt(aid)
+            if prompt:
+                variant_map[aid] = prompt["variant_id"]
+                logger.debug(
+                    "Arena selected %s for %s", prompt["variant_id"], aid,
+                )
+
+        # Track for post-trade analysis
+        self._last_variant_map = variant_map
+
         # ── Phase A: 5 Analytical agents in parallel ──
         analytical_tasks = [
             self._news_agent.analyze(
@@ -394,6 +457,11 @@ class Orchestrator:
                 logger.error("Analytical agent error: %s", result)
 
         # ── Phase B: Risk agent receives all analytical signals ──
+        risk_prompt = self._get_best_prompt("risk_agent")
+        if risk_prompt:
+            variant_map["risk_agent"] = risk_prompt["variant_id"]
+        self._last_variant_map = variant_map  # Update with risk agent variant
+
         try:
             risk_result = await self._risk_agent.analyze(
                 ticker=candidate.ticker,

@@ -273,6 +273,23 @@ class PromptArena:
             json.dump(self.to_dict(), f, indent=2)
         logger.info("Arena state saved to %s (%d variants)", p, len(self._variants))
 
+    # ── Helper Methods (Post-Trade Analysis Integration) ──
+
+    def get_variant_elo(self, variant_id: str) -> float:
+        """Get current Elo rating for a specific variant."""
+        variant = self._variants.get(variant_id)
+        if variant is None:
+            raise KeyError(f"Unknown variant: {variant_id}")
+        return variant.elo_rating
+
+    def get_all_agent_ids(self) -> list[str]:
+        """Get all agent IDs with registered variants."""
+        return list(self._agent_variants.keys())
+
+    def get_agent_variants(self, agent_id: str) -> list[PromptVariant]:
+        """Get all variants for an agent (alias for get_variants)."""
+        return self.get_variants(agent_id)
+
     @classmethod
     def load(cls, path: str | Path = "data/arena_ratings.json") -> PromptArena:
         """Load arena state from disk. Returns empty arena if file missing."""

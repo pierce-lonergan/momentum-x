@@ -195,3 +195,74 @@ class TestTrailingStopFullLifecycle:
 
         # No more active trailing stops
         assert len(manager.get_active_trailing_stops()) == 0
+
+
+# ── Post-Trade Elo Feedback Integration ──────────────────────
+
+
+class TestPostTradeEloFeedbackLoop:
+    """
+    Integration: Trade outcome → signal alignment → Elo update → arena state.
+
+    Verifies the full feedback loop from a completed trade through to
+    Elo rating changes in the PromptArena.
+    """
+
+    def test_full_feedback_loop(self):
+        """
+        End-to-end: seed arena → simulate trade → analyze → Elo changes.
+
+        Steps:
+        1. Seed arena with default variants (12 total)
+        2. Create a winning trade with known variant selections
+        3. Analyze trade → Elo updates
+        4. Verify aligned variant's Elo increased
+        5. Verify misaligned variant's Elo decreased (different trade)
+        """
+        from datetime import datetime, timezone
+        from src.agents.prompt_arena import PromptArena
+        from src.agents.default_variants import seed_default_variants
+        from src.analysis.post_trade import PostTradeAnalyzer, TradeResult
+
+        # Step 1: Seed arena
+        arena = seed_default_variants()
+        analyzer = PostTradeAnalyzer(arena=arena)
+
+        initial_news_elo = arena.get_variant_elo("news_structured_v1")
+        initial_tech_elo = arena.get_variant_elo("tech_structured_v1")
+
+        # Step 2: Winning trade — news was BULL (aligned), tech was BEAR (misaligned)
+        winning_trade = TradeResult(
+            ticker="AAPL",
+            entry_price=150.0,
+            exit_price=165.0,
+            entry_time=datetime(2026, 2, 1, 14, 30, tzinfo=timezone.utc),
+            exit_time=datetime(2026, 2, 1, 15, 45, tzinfo=timezone.utc),
+            agent_variants={
+                "news_agent": "news_structured_v1",
+                "technical_agent": "tech_structured_v1",
+            },
+            agent_signals={
+                "news_agent": "STRONG_BULL",       # Aligned with WIN
+                "technical_agent": "BEAR",          # Misaligned with WIN
+            },
+        )
+
+        # Step 3: Analyze
+        matchups = analyzer.analyze(winning_trade)
+        assert len(matchups) == 2
+
+        # Step 4: News variant was aligned → Elo should increase
+        new_news_elo = arena.get_variant_elo("news_structured_v1")
+        assert new_news_elo > initial_news_elo
+
+        # Step 5: Tech variant was misaligned → Elo should decrease
+        new_tech_elo = arena.get_variant_elo("tech_structured_v1")
+        assert new_tech_elo < initial_tech_elo
+
+        # Step 6: Verify Elo is still zero-sum
+        # Each matchup is independent, so check individual matchups
+        for m in matchups:
+            assert "winner" in m
+            assert "loser" in m
+            assert m["winner"] != m["loser"]

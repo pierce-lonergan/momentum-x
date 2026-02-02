@@ -1,7 +1,7 @@
 {
   "protocol": "TOR-P",
-  "version": "S008",
-  "last_updated": "2026-02-02T07:00:00Z",
+  "version": "S010",
+  "last_updated": "2026-02-02T09:00:00Z",
 
   "nodes": {
     "config.settings": {"type": "CONFIG", "file": "config/settings.py", "status": "COMPLETE"},
@@ -9,44 +9,38 @@
     "core.scoring": {"type": "ENGINE", "file": "src/core/scoring.py", "status": "COMPLETE"},
     "core.orchestrator": {
       "type": "ENGINE", "file": "src/core/orchestrator.py", "status": "COMPLETE",
-      "description": "6-agent pipeline. WebSocket VWAP (H-006) + SEC auto-query (H-004) + PromptArena selection (H-003) wired."
+      "description": "6-agent pipeline. TradeContext lifecycle. Arena variant tracking. Full structured logging."
     },
-    "core.backtester": {
-      "type": "ENGINE", "file": "src/core/backtester.py", "status": "COMPLETE",
-      "description": "CPCV backtest with optional slippage model (H-009 wired)"
-    },
+    "core.backtester": {"type": "ENGINE", "file": "src/core/backtester.py", "status": "COMPLETE"},
     "scanner.premarket": {"type": "SCANNER", "file": "src/scanners/premarket.py", "status": "COMPLETE"},
-    "agent.base": {"type": "AGENT", "file": "src/agents/base.py", "status": "COMPLETE"},
-    "agent.news": {"type": "AGENT", "file": "src/agents/news_agent.py", "status": "COMPLETE"},
-    "agent.technical": {"type": "AGENT", "file": "src/agents/technical_agent.py", "status": "COMPLETE"},
-    "agent.fundamental": {"type": "AGENT", "file": "src/agents/fundamental_agent.py", "status": "COMPLETE"},
-    "agent.institutional": {"type": "AGENT", "file": "src/agents/institutional_agent.py", "status": "COMPLETE"},
-    "agent.deep_search": {"type": "AGENT", "file": "src/agents/deep_search_agent.py", "status": "COMPLETE"},
-    "agent.risk": {"type": "AGENT", "file": "src/agents/risk_agent.py", "status": "COMPLETE"},
+    "agent.base": {"type": "AGENT", "file": "src/agents/base.py", "status": "COMPLETE", "logging": "trade_logger"},
+    "agent.news": {"type": "AGENT", "file": "src/agents/news_agent.py", "status": "COMPLETE", "logging": "trade_logger"},
+    "agent.technical": {"type": "AGENT", "file": "src/agents/technical_agent.py", "status": "COMPLETE", "logging": "trade_logger"},
+    "agent.fundamental": {"type": "AGENT", "file": "src/agents/fundamental_agent.py", "status": "COMPLETE", "logging": "trade_logger"},
+    "agent.institutional": {"type": "AGENT", "file": "src/agents/institutional_agent.py", "status": "COMPLETE", "logging": "trade_logger"},
+    "agent.deep_search": {"type": "AGENT", "file": "src/agents/deep_search_agent.py", "status": "COMPLETE", "logging": "trade_logger"},
+    "agent.risk": {"type": "AGENT", "file": "src/agents/risk_agent.py", "status": "COMPLETE", "logging": "trade_logger"},
     "agent.debate_engine": {"type": "ENGINE", "file": "src/agents/debate_engine.py", "status": "COMPLETE"},
     "agent.prompt_arena": {"type": "ENGINE", "file": "src/agents/prompt_arena.py", "status": "COMPLETE"},
     "agent.default_variants": {"type": "CONFIG", "file": "src/agents/default_variants.py", "status": "COMPLETE"},
+    "analysis.post_trade": {
+      "type": "ENGINE", "file": "src/analysis/post_trade.py", "status": "COMPLETE",
+      "description": "Automatic Elo feedback loop. Wired into CLI via cmd_analyze."
+    },
     "data.alpaca_client": {"type": "DATA_CLIENT", "file": "src/data/alpaca_client.py", "status": "COMPLETE"},
     "data.news_client": {"type": "DATA_CLIENT", "file": "src/data/news_client.py", "status": "COMPLETE"},
     "data.websocket_client": {"type": "DATA_CLIENT", "file": "src/data/websocket_client.py", "status": "COMPLETE"},
     "data.sec_client": {"type": "DATA_CLIENT", "file": "src/data/sec_client.py", "status": "COMPLETE"},
     "data.trade_updates": {"type": "DATA_CLIENT", "file": "src/data/trade_updates.py", "status": "COMPLETE"},
-    "data.trade_updates_stream": {
-      "type": "DATA_CLIENT", "file": "src/data/websocket_client.py",
-      "status": "COMPLETE",
-      "description": "TradeUpdatesStream: WebSocket listener dispatching to TrailingStopManager"
-    },
+    "data.trade_updates_stream": {"type": "DATA_CLIENT", "file": "src/data/websocket_client.py", "status": "COMPLETE"},
     "execution.alpaca_executor": {"type": "EXECUTOR", "file": "src/execution/alpaca_executor.py", "status": "COMPLETE"},
     "execution.position_manager": {"type": "EXECUTOR", "file": "src/execution/position_manager.py", "status": "COMPLETE"},
     "execution.slippage": {"type": "ENGINE", "file": "src/execution/slippage.py", "status": "COMPLETE"},
     "execution.trailing_stop_manager": {"type": "ENGINE", "file": "src/data/trade_updates.py", "status": "COMPLETE"},
     "utils.rate_limiter": {"type": "ENGINE", "file": "src/utils/rate_limiter.py", "status": "COMPLETE"},
     "utils.trade_filter": {"type": "ENGINE", "file": "src/utils/trade_filter.py", "status": "COMPLETE"},
-    "utils.logging": {
-      "type": "ENGINE", "file": "src/utils/trade_logger.py", "status": "COMPLETE",
-      "description": "JSON structured logging + async-safe correlation IDs via contextvars"
-    },
-    "cli.main": {"type": "CONFIG", "file": "main.py", "status": "COMPLETE"},
+    "utils.logging": {"type": "ENGINE", "file": "src/utils/trade_logger.py", "status": "COMPLETE"},
+    "cli.main": {"type": "CONFIG", "file": "main.py", "status": "COMPLETE", "commands": ["scan","evaluate","paper","backtest","analyze"]},
     "dx.readme": {"type": "CONFIG", "file": "README.md", "status": "COMPLETE"},
     "dx.docker": {"type": "CONFIG", "file": "Dockerfile", "status": "COMPLETE"},
     "dx.makefile": {"type": "CONFIG", "file": "Makefile", "status": "COMPLETE"},
@@ -76,15 +70,19 @@
     {"from": "agent.prompt_arena", "to": "core.orchestrator", "type": "optimizes"},
     {"from": "agent.default_variants", "to": "agent.prompt_arena", "type": "seeds"},
     {"from": "utils.logging", "to": "core.orchestrator", "type": "observes"},
-    {"from": "core.orchestrator", "to": "agent.news", "type": "dispatches"},
-    {"from": "core.orchestrator", "to": "agent.technical", "type": "dispatches"},
-    {"from": "core.orchestrator", "to": "agent.fundamental", "type": "dispatches"},
-    {"from": "core.orchestrator", "to": "agent.institutional", "type": "dispatches"},
-    {"from": "core.orchestrator", "to": "agent.deep_search", "type": "dispatches"},
-    {"from": "core.orchestrator", "to": "agent.risk", "type": "dispatches"},
-    {"from": "cli.main", "to": "core.orchestrator", "type": "depends_on"}
+    {"from": "utils.logging", "to": "agent.base", "type": "observes"},
+    {"from": "utils.logging", "to": "agent.news", "type": "observes"},
+    {"from": "utils.logging", "to": "agent.technical", "type": "observes"},
+    {"from": "utils.logging", "to": "agent.fundamental", "type": "observes"},
+    {"from": "utils.logging", "to": "agent.institutional", "type": "observes"},
+    {"from": "utils.logging", "to": "agent.deep_search", "type": "observes"},
+    {"from": "utils.logging", "to": "agent.risk", "type": "observes"},
+    {"from": "core.orchestrator", "to": "analysis.post_trade", "type": "feeds_into"},
+    {"from": "analysis.post_trade", "to": "agent.prompt_arena", "type": "updates_elo"},
+    {"from": "cli.main", "to": "analysis.post_trade", "type": "dispatches"}
   ],
 
-  "adrs": ["ADR-001", "ADR-002", "ADR-003", "ADR-004", "ADR-005", "ADR-006", "ADR-007", "ADR-008"],
-  "research_docs": ["BIBLIOGRAPHY.md", "ALPACA_API_CONSTRAINTS.md", "SEC_EDGAR_INTEGRATION.md", "PROMPT_ARENA.md", "ARENA_LIVE_SELECTION.md"]
+  "adrs": ["ADR-001","ADR-002","ADR-003","ADR-004","ADR-005","ADR-006","ADR-007","ADR-008","ADR-009"],
+  "research_docs": ["BIBLIOGRAPHY.md","ALPACA_API_CONSTRAINTS.md","SEC_EDGAR_INTEGRATION.md","PROMPT_ARENA.md","ARENA_LIVE_SELECTION.md","POST_TRADE_ANALYSIS.md"],
+  "math_sections": ["§1-§16"]
 }

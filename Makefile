@@ -73,6 +73,26 @@ evaluate: ## Run scanner + agent evaluation
 backtest: ## Run CPCV backtester
 	python -m main backtest
 
+# ── Analysis & Arena ─────────────────────────────────────────
+
+arena: ## Show Prompt Arena Elo ratings and variant performance
+	@python -c "\
+from src.agents.prompt_arena import PromptArena; \
+from src.agents.default_variants import seed_default_variants; \
+arena = PromptArena.load() if __import__('pathlib').Path('data/arena_ratings.json').exists() else seed_default_variants(); \
+print('\\n🏟️  MOMENTUM-X PROMPT ARENA\\n' + '='*60); \
+[print(f'  {aid}:') or [print(f'    {v.variant_id:30s} Elo={v.elo_rating:.0f}  W/L={v.win_count}/{v.match_count - v.win_count}  WR={v.win_rate:.0%}') for v in arena.get_variants(aid)] for aid in arena.get_all_agent_ids()]; \
+print('='*60)"
+
+arena-seed: ## Seed default prompt variants (12 total, 2 per agent)
+	@python -c "\
+from src.agents.default_variants import seed_default_variants; \
+arena = seed_default_variants(); arena.save(); \
+print('✅ Seeded 12 prompt variants and saved to data/arena_ratings.json')"
+
+analyze: ## Post-session analysis: compare trade outcomes vs agent signals, update Elo
+	python -m main analyze -v
+
 # ── Docker ───────────────────────────────────────────────────
 
 docker-up: ## Start paper trading in Docker

@@ -25,6 +25,9 @@ from typing import Any
 
 from src.agents.base import BaseAgent
 from src.core.models import AgentSignal, RiskSignal
+from src.utils.trade_logger import get_trade_logger
+
+logger = get_trade_logger(__name__)
 
 
 class RiskAgent(BaseAgent):

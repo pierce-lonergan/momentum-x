@@ -321,3 +321,82 @@ Example: `a1b2c3d4-AAPL`
 Correlation ID propagates via `contextvars.ContextVar` across all async
 pipeline stages, enabling full trade lifecycle tracing in structured JSON logs.
 
+---
+
+## §15 Post-Trade Elo Feedback Dynamics
+
+**Ref**: ADR-009, `src/analysis/post_trade.py`, arXiv:2403.04132
+
+### 15.1 Signal Alignment Function
+
+Define the alignment indicator $\mathbb{1}_{\text{align}}$ for agent $a$
+given signal $s_a$ and realized P&L $\pi$:
+
+$$
+\mathbb{1}_{\text{align}}(s_a, \pi) = \begin{cases}
+1 & \text{if } s_a \in \{\text{STRONG\_BULL}, \text{BULL}\} \text{ and } \pi > 0 \\
+1 & \text{if } s_a \in \{\text{BEAR}, \text{STRONG\_BEAR}, \text{NEUTRAL}\} \text{ and } \pi \leq 0 \\
+0 & \text{otherwise}
+\end{cases}
+$$
+
+### 15.2 Counterfactual Matchup
+
+For agent $a$ with active variant $v_{\text{active}}$ and opponent
+$v_{\text{opp}} \sim \text{Uniform}(V_a \setminus \{v_{\text{active}}\})$:
+
+$$
+(w, l) = \begin{cases}
+(v_{\text{active}}, v_{\text{opp}}) & \text{if } \mathbb{1}_{\text{align}} = 1 \\
+(v_{\text{opp}}, v_{\text{active}}) & \text{if } \mathbb{1}_{\text{align}} = 0
+\end{cases}
+$$
+
+### 15.3 Elo Update (per matchup)
+
+Standard Elo update from §12 applied with the matchup from §15.2:
+
+$$
+R'_w = R_w + K \cdot (1 - E_w), \quad R'_l = R_l + K \cdot (0 - E_l)
+$$
+
+where $E_w = \frac{1}{1 + 10^{(R_l - R_w)/400}}$ and $K = 32$.
+
+### 15.4 Convergence Bound
+
+After $n$ trades per agent, the expected Elo estimation error is bounded by:
+
+$$
+\text{Var}(\hat{R}) \approx \frac{K^2}{4n}
+$$
+
+For $K=32$, achieving $\pm 50$ Elo precision requires $n \geq \frac{32^2}{4 \cdot 50^2} \approx 41$ trades.
+This aligns with the cold-start threshold of 10 matches for exploration.
+
+---
+
+## §16 Agent Structured Logging Schema
+
+**Ref**: ADR-008, `src/utils/trade_logger.py`
+
+### 16.1 Log Event Structure
+
+Each structured log event $\ell$ is a JSON object:
+
+$$
+\ell = \{t, \text{trade\_id}, \text{ticker}, \text{phase}, \text{component}, \text{level}, \text{message}, \text{extra}\}
+$$
+
+where $t$ is ISO-8601 timestamp, and `extra` carries agent-specific metadata
+(confidence scores, signal directions, prompt variant IDs).
+
+### 16.2 Observability Invariant
+
+For any trade $T$ with ID $\text{id}_T$, the complete pipeline trace
+must satisfy:
+
+$$
+|\{\ell : \ell.\text{trade\_id} = \text{id}_T\}| \geq 8
+$$
+
+(minimum: 1 context set + 6 agent signals + 1 verdict)

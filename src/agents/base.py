@@ -32,8 +32,9 @@ from typing import Any
 import litellm
 
 from src.core.models import AgentSignal
+from src.utils.trade_logger import get_trade_logger
 
-logger = logging.getLogger(__name__)
+logger = get_trade_logger(__name__)
 
 # Suppress litellm's verbose logging
 litellm.suppress_debug_info = True

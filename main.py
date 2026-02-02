@@ -34,8 +34,12 @@ import logging
 import signal
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
 from config.settings import Settings
+from src.analysis.post_trade import PostTradeAnalyzer, TradeResult
+from src.agents.prompt_arena import PromptArena
+from src.agents.default_variants import seed_default_variants
 
 logger = logging.getLogger("momentum_x")
 
@@ -176,6 +180,86 @@ async def cmd_backtest(settings: Settings) -> None:
     logger.info("Backtest mode ready. Requires historical candidate data.")
 
 
+async def cmd_analyze(settings: Settings) -> None:
+    """
+    Post-session analysis: load closed trades, compute Elo feedback, update arena.
+
+    ### ARCHITECTURAL CONTEXT
+    Node ID: cli.analyze
+    Graph Link: docs/memory/graph_state.json → "cli.main"
+
+    ### RESEARCH BASIS
+    Closes the Elo optimization loop from ADR-009.
+    Ref: docs/research/POST_TRADE_ANALYSIS.md
+    Ref: MOMENTUM_LOGIC.md §15 (Elo Feedback Dynamics)
+
+    ### CRITICAL INVARIANTS
+    1. Arena state is loaded from disk (or seeded fresh if missing).
+    2. Batch analysis processes ALL closed trades from the session.
+    3. Updated Elo ratings are saved back to disk.
+    4. Summary is printed to stdout for operator review.
+    """
+    logger.info("📊 Starting post-session analysis...")
+
+    # Load or seed arena
+    arena_path = Path("data/arena_ratings.json")
+    if arena_path.exists():
+        arena = PromptArena.load(str(arena_path))
+        logger.info("Loaded arena state from %s", arena_path)
+    else:
+        arena = seed_default_variants()
+        logger.info("No arena state found — seeded defaults")
+
+    analyzer = PostTradeAnalyzer(arena=arena)
+
+    # Load closed trades from position manager data
+    trades_path = Path("data/closed_trades.json")
+    trade_results: list[TradeResult] = []
+
+    if trades_path.exists():
+        import json
+        raw_trades = json.loads(trades_path.read_text())
+        for t in raw_trades:
+            try:
+                trade_results.append(TradeResult(
+                    ticker=t["ticker"],
+                    entry_price=t["entry_price"],
+                    exit_price=t["exit_price"],
+                    entry_time=datetime.fromisoformat(t["entry_time"]),
+                    exit_time=datetime.fromisoformat(t["exit_time"]),
+                    agent_variants=t.get("agent_variants", {}),
+                    agent_signals=t.get("agent_signals", {}),
+                ))
+            except (KeyError, ValueError) as e:
+                logger.warning("Skipping malformed trade record: %s", e)
+    else:
+        logger.info("No closed trades found at %s", trades_path)
+
+    # Run batch analysis
+    if trade_results:
+        total_matchups = analyzer.batch_analyze(trade_results)
+        logger.info(
+            "Processed %d trades → %d Elo matchups",
+            len(trade_results), total_matchups,
+        )
+
+        # Save updated arena state
+        arena.save(str(arena_path))
+        logger.info("Arena state saved to %s", arena_path)
+    else:
+        logger.info("No trades to analyze")
+
+    # Print Elo summary
+    summary = analyzer.get_elo_summary()
+    print("\n🏟️  PROMPT ARENA — ELO RATINGS AFTER ANALYSIS")
+    print("=" * 60)
+    for vid, elo in sorted(summary.items(), key=lambda x: x[1], reverse=True):
+        print(f"  {vid:35s} Elo = {elo:.0f}")
+    print("=" * 60)
+    print(f"  Trades analyzed: {len(trade_results)}")
+    print()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="momentum-x",
@@ -183,7 +267,7 @@ def main() -> None:
     )
     parser.add_argument(
         "command",
-        choices=["scan", "evaluate", "paper", "backtest"],
+        choices=["scan", "evaluate", "paper", "backtest", "analyze"],
         help="Operating mode",
     )
     parser.add_argument(
@@ -221,6 +305,7 @@ def main() -> None:
         "evaluate": cmd_evaluate,
         "paper": cmd_paper,
         "backtest": cmd_backtest,
+        "analyze": cmd_analyze,
     }
 
     asyncio.run(commands[args.command](settings))
