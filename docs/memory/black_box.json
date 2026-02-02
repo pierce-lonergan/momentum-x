@@ -1,94 +1,35 @@
 {
-  "protocol": "TOR-P",
-  "session_id": "S010_CLI_WIRING_LOGGING_RESEARCH",
-  "timestamp": "2026-02-02T09:00:00Z",
-
-  "resumption_vector": {
+    "session": "S013",
+    "timestamp": "2026-02-02T11:00:00Z",
+    "state_reconstruction": "Resuming from S012 research recording. All 3 PLANNED nodes (analysis.shapley, core.llm_leakage, scanner.gex) now COMPLETE with full TDD coverage. 359 tests passing. Graph: 24 nodes all COMPLETE, 12 ADRs, §1-§19 formalized.",
     "completed_this_session": [
-      "ADR-009: Post-Trade Feedback Loop decision record",
-      "MOMENTUM_LOGIC.md §15: Elo Feedback Dynamics (alignment function, matchup, convergence bound)",
-      "MOMENTUM_LOGIC.md §16: Agent Structured Logging Schema (event structure, observability invariant)",
-      "CLI wiring: cmd_analyze() loads closed trades → PostTradeAnalyzer → Elo updates → arena save",
-      "Makefile: 'make analyze' and 'make arena-seed' commands",
-      "Agent logging migration: all 7 modules (base + 6 agents) now use get_trade_logger",
-      "12 new tests (288 total, all passing, ZERO warnings)",
-      "3 deep research prompts for project enhancement"
+        "IMPLEMENTED analysis.shapley (21 tests): ShapleyAttributor with exact 2^6 coalition enumeration, threshold_aware + proportional characteristic functions, Shapley-to-Elo sigmoid conversion, EnrichedTradeResult dataclass",
+        "VERIFIED 4 Shapley axioms: Efficiency (Σφ=v(N)-v(∅)), Symmetry (identical→equal), Null Player (zero→0), Additivity (linear decomposition)",
+        "DISCOVERED v(∅)=0 invariant bug: threshold=0 caused v(∅)=pnl → fixed with explicit empty coalition gate",
+        "DISCOVERED threshold unanimity game: threshold=0 makes all non-empty v(S)=pnl → added 'proportional' mode for linear attribution",
+        "IMPLEMENTED core.llm_leakage (27 tests): KnowledgeCutoffRegistry (Qwen/DeepSeek/GPT-4o/Claude cutoffs), LeakageDetector (contamination check, LLM-aware embargo), CounterfactualSimulator (IDS metric), CachedAgentWrapper (deterministic replay)",
+        "IMPLEMENTED scanner.gex (23 tests): GEXCalculator (naive model D_call=+1,D_put=-1), GEXResult, OptionsChainEntry, SyntheticOptionsProvider, GEXRegime enum, gamma flip grid search, regime classification, <500ms benchmark verified"
     ],
-    "immediate_next": {
-      "file": "src/execution/position_manager.py",
-      "task": "Implement closed_trades.json serialization — PositionManager.save_closed_trades() to write TradeResult-compatible JSON for cmd_analyze consumption."
+    "next_action": {
+        "priority_1": "WIRE integration: ShapleyAttributor into PostTradeAnalyzer.analyze() — replace binary is_signal_aligned() with Shapley-based Elo updates. Requires adding agent_component_scores to trade pipeline.",
+        "priority_2": "WIRE integration: GEXCalculator into scan_premarket_gappers() — add hard filter gate for extreme positive GEX and soft signal to InstitutionalAgent prompt.",
+        "priority_3": "WIRE integration: LeakageDetector + CachedAgentWrapper into BacktestRunner — add contamination checks per fold, response caching for deterministic replay.",
+        "priority_4": "IMPLEMENT BacktestMetrics: DSR and PBO computation per §18.4-§18.5 formulas."
     },
-    "secondary_targets": [
-      "Web dashboard (Flask/FastAPI + htmx) for real-time trade monitoring",
-      "Performance profiling: orchestrator latency breakdown per agent",
-      "Shapley value-based agent attribution (ADR-009 Alternative #3)",
-      "CPCV backtester integration with arena variants",
-      "Multi-strategy support (mean reversion, gap fill patterns)"
+    "cognitive_load": {
+        "shapley_key_insight": "Two characteristic function modes: 'threshold_aware' (weighted majority game, pivotality-based attribution) and 'proportional' (linear, score-proportional attribution). The threshold mode creates non-intuitive attribution near τ=0.6 where pivotal agents get credit regardless of score magnitude. The proportional mode gives clean linear decomposition. Both satisfy all 4 axioms.",
+        "llm_leakage_key_insight": "Knowledge cutoff registry covers Qwen(Sep 2024), DeepSeek(Jul 2024), GPT-4o(Apr 2024), Claude(Mar 2025). Buffer of 30 days. LLM-aware embargo: e_LLM = max(e_standard, t_cutoff + buffer - t_test_end). IDS threshold: 0.8 (auto-reject below). CachedAgentWrapper uses SHA256 prompt hashing for deterministic replay.",
+        "gex_key_insight": "Naive model: D_call=+1, D_put=-1. Normalization: GEX/(ADV×S). Regime thresholds: >0.05 SUPPRESSION, <-0.01 ACCELERATION. Gamma flip via grid search with linear interpolation across S±20%. SyntheticOptionsProvider generates realistic chains with ATM-peaked gamma and moneyness-decayed OI."
+    },
+    "test_count": 359,
+    "unresolved_debt": [
+        "PostTradeAnalyzer.analyze() still uses binary is_signal_aligned() — needs Shapley wiring",
+        "scan_premarket_gappers() lacks GEX filter gate — needs GEXCalculator integration",
+        "BacktestRunner lacks LeakageDetector + CachedAgentWrapper hooks",
+        "BacktestMetrics class needs DSR and PBO implementations (formulas in §18.4-18.5)",
+        "CandidateStock model needs gex_net, gex_normalized, gamma_flip_price fields",
+        "InstitutionalAgent prompt needs GEX data injection point",
+        "EnrichedTradeResult needs to be constructed from actual orchestrator pipeline data",
+        "OptionsDataProvider needs concrete Polygon.io / Alpaca implementations"
     ]
-  },
-
-  "unresolved_hypotheses": {
-    "H-001": {"status": "RESOLVED"},
-    "H-002": {"status": "OPEN", "statement": "R1 JSON reliability — needs live LLM API key"},
-    "H-003": {"status": "RESOLVED"},
-    "H-004": {"status": "RESOLVED"},
-    "H-005": {"status": "RESOLVED"},
-    "H-006": {"status": "RESOLVED"},
-    "H-007": {"status": "RESOLVED"},
-    "H-008": {"status": "RESOLVED"},
-    "H-009": {"status": "RESOLVED"}
-  },
-
-  "cognitive_load": {
-    "critical_context": [
-      "288 TESTS, ZERO WARNINGS across 26 test files.",
-      "9 ADRs, 6 research docs, 16 math sections.",
-      "FULL CLOSED LOOP: agents → signals → orchestrator → trade → PostTradeAnalyzer → Elo → arena → agents",
-      "All 7 agent modules now use structured trade_logger with async-safe TradeContext.",
-      "CLI has 5 commands: scan, evaluate, paper, backtest, analyze.",
-      "Missing piece: PositionManager needs to serialize closed trades to data/closed_trades.json."
-    ],
-    "architectural_debt": [
-      "H-002: R1 JSON reliability — needs live LLM API key",
-      "PositionManager does not yet serialize closed trades for cmd_analyze",
-      "No web dashboard for trade monitoring",
-      "MyPy runs in non-blocking mode",
-      "Debate engine not yet using trade_logger"
-    ]
-  },
-
-  "test_state": {
-    "total": 288,
-    "passing": 288,
-    "failing": 0,
-    "warnings": 0,
-    "suites": {
-      "tests/integration/test_pipeline.py": 2,
-      "tests/integration/test_wiring.py": 6,
-      "tests/property/test_scanner_properties.py": 19,
-      "tests/property/test_invariants.py": 17,
-      "tests/unit/test_scoring.py": 9,
-      "tests/unit/test_alpaca_client.py": 6,
-      "tests/unit/test_news_agent.py": 7,
-      "tests/unit/test_risk_agent.py": 7,
-      "tests/unit/test_debate_engine.py": 7,
-      "tests/unit/test_executor.py": 10,
-      "tests/unit/test_backtester.py": 10,
-      "tests/unit/test_technical_agent.py": 5,
-      "tests/unit/test_remaining_agents.py": 12,
-      "tests/unit/test_rate_limiter.py": 14,
-      "tests/unit/test_websocket.py": 18,
-      "tests/unit/test_prompt_arena.py": 20,
-      "tests/unit/test_sec_client.py": 18,
-      "tests/unit/test_slippage.py": 13,
-      "tests/unit/test_trade_updates.py": 17,
-      "tests/unit/test_default_variants.py": 7,
-      "tests/unit/test_logging.py": 15,
-      "tests/unit/test_trade_updates_stream.py": 8,
-      "tests/unit/test_arena_wiring.py": 5,
-      "tests/unit/test_orchestrator_context.py": 5,
-      "tests/unit/test_post_trade.py": 18,
-      "tests/unit/test_cli_analyze.py": 12
-    }
-  }
 }

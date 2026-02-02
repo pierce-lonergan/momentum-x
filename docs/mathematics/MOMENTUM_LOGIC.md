@@ -400,3 +400,200 @@ $$
 $$
 
 (minimum: 1 context set + 6 agent signals + 1 verdict)
+
+---
+
+## §17 Shapley Value Attribution
+
+**Research Basis**: `docs/research/SHAPLEY_ATTRIBUTION.md`
+**ADR**: ADR-010
+
+### 17.1 Cooperative Game Definition
+
+Define the agent attribution game $(N, v)$ where $N = \{a_1, \dots, a_6\}$ is the set
+of 6 agents and $v: 2^N \to \mathbb{R}$ is the characteristic function.
+
+### 17.2 Characteristic Function (Threshold-Aware)
+
+For coalition $S \subseteq N$, compute MFCS using only agents in $S$ (zero-fill absent):
+
+$$
+v(S) = \begin{cases}
+\text{realized\_pnl} & \text{if } \text{MFCS}(S) \geq \tau_{debate} \\
+0 & \text{otherwise}
+\end{cases}
+$$
+
+where $\tau_{debate} = 0.6$ is the debate trigger threshold from §5.
+
+### 17.3 Shapley Value
+
+$$
+\phi_i(v) = \sum_{S \subseteq N \setminus \{i\}} \frac{|S|! (n - |S| - 1)!}{n!} [v(S \cup \{i\}) - v(S)]
+$$
+
+For $n = 6$: exact computation over $2^6 = 64$ coalitions.
+
+### 17.4 Sigmoid Smoothing (Optional)
+
+To stabilize attribution near the debate threshold:
+
+$$
+v_\sigma(S) = \sigma\!\left(k \cdot (\text{MFCS}(S) - \tau_{debate})\right) \times \text{realized\_pnl}
+$$
+
+where $\sigma(x) = 1/(1 + e^{-x})$ and $k$ is a temperature parameter.
+
+### 17.5 Shapley-to-Elo Conversion
+
+Map $\phi_i$ to Elo actual score via sigmoid squash:
+
+$$
+S_i^{Elo} = \frac{1}{1 + e^{-\phi_i / \beta}}
+$$
+
+where $\beta$ calibrated to typical Shapley magnitude. Then apply standard
+Elo update from §12.2:
+
+$$
+R_i' = R_i + K \cdot (S_i^{Elo} - E_i)
+$$
+
+### 17.6 Axiomatic Invariants
+
+The implementation MUST satisfy:
+
+1. **Efficiency**: $\sum_{i=1}^{6} \phi_i = v(N) - v(\emptyset)$
+2. **Symmetry**: Identical agents $\Rightarrow$ identical $\phi_i$
+3. **Null Player**: Zero-contribution agent $\Rightarrow$ $\phi_i = 0$
+4. **Additivity**: $\phi_i(v + w) = \phi_i(v) + \phi_i(w)$
+
+---
+
+## §18 LLM-Aware CPCV and Deflated Sharpe Ratio
+
+**Research Basis**: `docs/research/CPCV_LLM_LEAKAGE.md`
+**ADR**: ADR-011
+
+### 18.1 Purged Training Set
+
+Let observation $t$ have label derived from $[t, t+h]$. The purged training set:
+
+$$
+\mathcal{T}_{train}^{purged} = \mathcal{T}_{train}^{std} \setminus \bigcup_{i \in \mathcal{T}_{test}} \{ j \mid [j, j+h] \cap [i, i+h] \neq \emptyset \}
+$$
+
+### 18.2 Embargoed Training Set
+
+$$
+\mathcal{T}_{train}^{embargoed} = \mathcal{T}_{train}^{purged} \setminus \{ j \mid j \in (\max(\mathcal{T}_{test}), \max(\mathcal{T}_{test}) + \delta] \}
+$$
+
+### 18.3 LLM-Aware Embargo Extension
+
+For model with knowledge cutoff $t_{cutoff}$:
+
+$$
+e_{LLM} = \max(\delta_{standard},\ t_{cutoff} + 30\text{d} - t_{test\_end})
+$$
+
+Any fold where $t_{test} < t_{cutoff} + 30\text{d}$ is flagged **CONTAMINATED**.
+
+### 18.4 Deflated Sharpe Ratio
+
+Standard error of SR (adjusted for higher moments):
+
+$$
+\hat{\sigma}_{\widehat{SR}}^2 = \frac{1}{T-1} \left( 1 + \frac{1}{2}\widehat{SR}^2 - \gamma_3 \widehat{SR} + \frac{\gamma_4 - 3}{4}\widehat{SR}^2 \right)
+$$
+
+Expected maximum SR from $N$ unskilled strategies:
+
+$$
+E[\max_N] \approx \sigma_{SR} \left( (1 - \gamma) Z^{-1}\!\left(1 - \frac{1}{N}\right) + \gamma Z^{-1}\!\left(1 - \frac{1}{Ne}\right) \right)
+$$
+
+where $\gamma \approx 0.5772$ (Euler-Mascheroni constant).
+
+$$
+\text{DSR}(\widehat{SR}) = \Phi\!\left( \frac{\widehat{SR} - E[\max_N]}{\hat{\sigma}_{\widehat{SR}}} \right)
+$$
+
+**Acceptance**: DSR > 0.95 required.
+
+### 18.5 Probability of Backtest Overfitting
+
+$$
+\text{PBO} = \frac{1}{L} \sum_{n=1}^{L} \mathbb{I}(R_{n,s^*}^{OOS} < \omega_n)
+$$
+
+where $\omega_n = \text{Median}(\{R_{n,s}^{OOS}\})$ across strategy configurations.
+
+### 18.6 Input Dependency Score (Leakage Detection)
+
+$$
+\text{IDS} = \frac{1}{M} \sum_{i=1}^{M} \mathbb{I}(f(x_i) \neq f(x'_i))
+$$
+
+**Invariant**: IDS < 0.8 $\Rightarrow$ strategy automatically rejected.
+
+---
+
+## §19 Options-Implied Gamma Exposure (GEX)
+
+**Research Basis**: `docs/research/GEX_GAMMA_EXPOSURE.md`
+**ADR**: ADR-012
+
+### 19.1 Gamma Definition
+
+$$
+\Gamma = \frac{\phi(d_1)}{S \cdot \sigma \cdot \sqrt{T}}
+$$
+
+where $d_1 = \frac{\ln(S/K) + (r + \sigma^2/2) \cdot T}{\sigma \cdot \sqrt{T}}$
+and $\phi$ is the standard normal PDF.
+
+### 19.2 Net Gamma Exposure
+
+$$
+\text{GEX}_{net} = \sum_{i=1}^{N} OI_i \times \Gamma_i \times S \times 100 \times D_i
+$$
+
+Dealer direction: $D_{call} = +1$ (dealer long), $D_{put} = -1$ (dealer short).
+
+### 19.3 Normalized GEX
+
+$$
+\text{GEX}_{norm} = \frac{\text{GEX}_{net}}{\text{ADV} \times S}
+$$
+
+where ADV = average daily volume (shares) over trailing 20 days.
+
+### 19.4 Gamma Flip Point
+
+The spot price $S^*$ where $\text{GEX}_{net}(S^*) = 0$:
+
+$$
+S^* = \arg\min_{S'} |\text{GEX}_{net}(S')|, \quad S' \in [S_{current} \times 0.8,\ S_{current} \times 1.2]
+$$
+
+### 19.5 Regime Classification
+
+$$
+\text{Regime} = \begin{cases}
+\text{SUPPRESSION} & \text{if } \text{GEX}_{norm} > \theta_{sup} \\
+\text{NEUTRAL} & \text{if } |\text{GEX}_{norm}| \leq \theta_{sup} \\
+\text{ACCELERATION} & \text{if } \text{GEX}_{norm} < -\theta_{acc}
+\end{cases}
+$$
+
+### 19.6 Extended EMC Conjunction
+
+The scanner admission formula from §4 is extended:
+
+$$
+\text{ADMIT}(s) = \left( G_\% > 5 \right) \wedge \left( R_{vol} > 2.0 \right) \wedge \left( A_{ratio} > 1.5 \right) \wedge \left( \text{GEX}_{norm} < \theta_{reject} \right)
+$$
+
+Candidates with extreme positive GEX ($\text{GEX}_{norm} > \theta_{reject}$) are
+rejected at scan time (hard filter). Moderate GEX passed to InstitutionalAgent as soft signal.
