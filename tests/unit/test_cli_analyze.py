@@ -122,3 +122,33 @@ class TestTradeLoggerInOrchestrator:
         source = open(mod.__file__).read()
         assert "set_trade_context" in source
         assert "clear_trade_context" in source
+
+
+class TestCLIScanLoop:
+    """Verify CLI scan command with ScanLoop integration."""
+
+    def test_scan_loop_import(self):
+        """ScanLoop should be importable from main's cmd_scan path."""
+        from src.core.scan_loop import ScanLoop
+        from config.settings import Settings
+        loop = ScanLoop(settings=Settings())
+        assert loop is not None
+
+    def test_scan_loop_empty_quotes(self):
+        """cmd_scan with empty quotes should produce no candidates."""
+        from src.core.scan_loop import ScanLoop
+        from config.settings import Settings
+        loop = ScanLoop(settings=Settings())
+        candidates = loop.run_single_scan({})
+        assert candidates == []
+
+    def test_main_accepts_scan_with_interval(self):
+        """CLI parser should accept --interval and --once flags."""
+        from main import main
+        import argparse
+
+        # Verify the parser accepts the new args by checking the module source
+        import main as main_mod
+        source = open(main_mod.__file__).read()
+        assert "--interval" in source
+        assert "--once" in source

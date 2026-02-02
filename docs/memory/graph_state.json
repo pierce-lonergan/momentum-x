@@ -1,7 +1,7 @@
 {
     "protocol": "TOR-P",
-    "version": "S016",
-    "last_updated": "2026-02-02T14:00:00Z",
+    "version": "S017",
+    "last_updated": "2026-02-02T15:00:00Z",
     "nodes": {
         "config.settings": {"type": "CONFIG", "file": "config/settings.py", "status": "COMPLETE"},
         "core.models": {"type": "MODEL", "file": "src/core/models.py", "status": "COMPLETE"},
@@ -10,8 +10,8 @@
         "core.backtester": {"type": "ENGINE", "file": "src/core/backtester.py", "status": "COMPLETE"},
         "core.llm_leakage": {"type": "ENGINE", "file": "src/core/llm_leakage.py", "status": "COMPLETE"},
         "core.llm_aware_backtester": {"type": "ENGINE", "file": "src/core/llm_aware_backtester.py", "status": "COMPLETE"},
-        "core.backtest_metrics": {"type": "ENGINE", "file": "src/core/backtest_metrics.py", "status": "COMPLETE", "note": "DSR + evaluate_strategy_acceptance() combined PBO+DSR gate"},
-        "core.scan_loop": {"type": "ENGINE", "file": "src/core/scan_loop.py", "status": "COMPLETE", "description": "ScanLoop: quotes→EMC filter→GEX enrichment→hard filter→CandidateStock list"},
+        "core.backtest_metrics": {"type": "ENGINE", "file": "src/core/backtest_metrics.py", "status": "COMPLETE"},
+        "core.scan_loop": {"type": "ENGINE", "file": "src/core/scan_loop.py", "status": "COMPLETE"},
         "scanner.premarket": {"type": "SCANNER", "file": "src/scanners/premarket.py", "status": "COMPLETE"},
         "scanner.gex": {"type": "SCANNER", "file": "src/scanners/gex.py", "status": "COMPLETE"},
         "scanner.gex_filter": {"type": "SCANNER", "file": "src/scanners/gex_filter.py", "status": "COMPLETE"},
@@ -27,34 +27,14 @@
         "analysis.post_trade": {"type": "ANALYSIS", "file": "src/analysis/post_trade.py", "status": "COMPLETE"},
         "analysis.shapley": {"type": "ANALYSIS", "file": "src/analysis/shapley.py", "status": "COMPLETE"},
         "data.alpaca_client": {"type": "CLIENT", "file": "src/data/alpaca_client.py", "status": "COMPLETE"},
-        "data.options_provider": {"type": "CLIENT", "file": "src/data/options_provider.py", "status": "COMPLETE", "description": "AlpacaOptionsProvider: Alpaca /v2/options/contracts → OptionsChainEntry"},
+        "data.options_provider": {"type": "CLIENT", "file": "src/data/options_provider.py", "status": "COMPLETE"},
         "execution.slippage": {"type": "ENGINE", "file": "src/execution/slippage.py", "status": "COMPLETE"},
-        "execution.position_manager": {"type": "ENGINE", "file": "src/execution/position_manager.py", "status": "COMPLETE", "note": "ScoredCandidate cache + close_position_with_attribution() hook"},
-        "execution.alpaca_client": {"type": "CLIENT", "file": "src/execution/alpaca_executor.py", "status": "COMPLETE"},
-        "utils.logging": {"type": "UTILITY", "file": "src/utils/logging.py", "status": "COMPLETE"},
-        "cli.main": {"type": "CLI", "file": "src/cli/main.py", "status": "COMPLETE"}
+        "execution.position_manager": {"type": "ENGINE", "file": "src/execution/position_manager.py", "status": "COMPLETE"},
+        "execution.alpaca_executor": {"type": "CLIENT", "file": "src/execution/alpaca_executor.py", "status": "COMPLETE"},
+        "utils.logging": {"type": "UTILITY", "file": "src/utils/trade_logger.py", "status": "COMPLETE"},
+        "cli.main": {"type": "CLI", "file": "main.py", "status": "COMPLETE", "note": "scan --interval --once flags, ScanLoop integration, _fetch_scan_quotes"}
     },
-    "edges": [
-        {"from": "scanner.premarket", "to": "core.scan_loop", "type": "used_by"},
-        {"from": "scanner.gex_filter", "to": "core.scan_loop", "type": "gates"},
-        {"from": "core.scan_loop", "to": "core.orchestrator", "type": "feeds_into"},
-        {"from": "core.orchestrator", "to": "agent.base", "type": "dispatches"},
-        {"from": "core.orchestrator", "to": "agent.debate_engine", "type": "triggers"},
-        {"from": "agent.prompt_arena", "to": "agent.base", "type": "selects_variant"},
-        {"from": "core.scoring", "to": "core.orchestrator", "type": "computes_mfcs"},
-        {"from": "core.orchestrator", "to": "execution.position_manager", "type": "opens_position"},
-        {"from": "execution.position_manager", "to": "execution.alpaca_client", "type": "executes_via"},
-        {"from": "execution.position_manager", "to": "analysis.post_trade", "type": "triggers_on_close"},
-        {"from": "execution.slippage", "to": "execution.position_manager", "type": "adjusts"},
-        {"from": "core.backtester", "to": "core.scoring", "type": "evaluates"},
-        {"from": "core.llm_leakage", "to": "core.llm_aware_backtester", "type": "validates"},
-        {"from": "core.backtest_metrics", "to": "core.backtester", "type": "augments"},
-        {"from": "data.options_provider", "to": "scanner.gex", "type": "provides_chain"},
-        {"from": "data.options_provider", "to": "core.scan_loop", "type": "feeds_gex"},
-        {"from": "analysis.shapley", "to": "analysis.post_trade", "type": "wired"},
-        {"from": "analysis.post_trade", "to": "agent.prompt_arena", "type": "updates_elo"}
-    ],
     "adrs": ["ADR-001","ADR-002","ADR-003","ADR-004","ADR-005","ADR-006","ADR-007","ADR-008","ADR-009","ADR-010","ADR-011","ADR-012","ADR-013","ADR-014","ADR-015"],
     "math_sections": "§1-§19",
-    "test_count": 412
+    "test_count": 415
 }

@@ -54,34 +54,138 @@ def setup_logging(verbose: bool = False) -> None:
     logging.getLogger("litellm").setLevel(logging.WARNING)
 
 
-async def cmd_scan(settings: Settings) -> None:
+async def cmd_scan(settings: Settings, interval: int = 30, once: bool = False) -> None:
     """
-    Run pre-market gap scanner only.
-    Outputs ranked candidate list without agent evaluation.
+    Run pre-market gap scanner with optional continuous polling.
+
+    Modes:
+      --once: single scan iteration, print candidates, exit
+      default: continuous polling every --interval seconds
+
+    Pipeline per iteration:
+      1. Fetch market snapshots from Alpaca
+      2. EMC conjunction filter (Gap%, RVOL, ATR)
+      3. GEX enrichment (if options data available)
+      4. GEX hard filter (reject extreme positive GEX)
+      5. Output ranked CandidateStock list
+
+    Ref: SYSTEM_ARCHITECTURE.md (Phase 1: Pre-Market)
+    Ref: ADR-014 (Pipeline Closure)
     """
+    from src.core.scan_loop import ScanLoop
     from src.data.alpaca_client import AlpacaDataClient
 
     logger.info("═══ MOMENTUM-X PRE-MARKET SCANNER ═══")
-    logger.info("Mode: %s | Feed: %s", settings.mode, settings.alpaca.feed)
+    logger.info("Mode: %s | Feed: %s | Interval: %ds | Once: %s",
+                settings.mode, settings.alpaca.feed, interval, once)
 
     client = AlpacaDataClient(settings.alpaca)
 
-    # Check account connectivity
+    # Verify connectivity
     try:
         account = await client.get_account()
         equity = float(account.get("equity", 0))
-        bp = float(account.get("buying_power", 0))
-        logger.info("Account: equity=$%.2f, buying_power=$%.2f", equity, bp)
+        logger.info("Account connected: equity=$%.2f", equity)
     except Exception as e:
         logger.error("Failed to connect to Alpaca: %s", e)
         logger.error("Check ALPACA_API_KEY and ALPACA_SECRET_KEY env vars")
         return
 
-    # TODO: Fetch most active/gapping tickers from Alpaca screener
-    # For now, demonstrate the pipeline with placeholder tickers
-    logger.info("Scanner: Fetching market snapshots...")
-    logger.info("(Full scanner integration requires Alpaca market data subscription)")
-    logger.info("Scanner complete. Use 'evaluate' mode for full agent pipeline.")
+    scan_loop = ScanLoop(settings=settings)
+
+    # Graceful shutdown
+    shutdown = asyncio.Event()
+
+    def handle_signal(sig, frame):
+        logger.info("Shutdown signal received.")
+        shutdown.set()
+
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
+
+    iteration = 0
+    while not shutdown.is_set():
+        iteration += 1
+        now = datetime.now(timezone.utc)
+        logger.info("─── Scan iteration #%d at %s ───", iteration, now.strftime("%H:%M:%S UTC"))
+
+        try:
+            # Fetch snapshots from Alpaca (most-active tickers)
+            quotes = await _fetch_scan_quotes(client, settings)
+
+            if quotes:
+                candidates = scan_loop.run_single_scan(quotes)
+                if candidates:
+                    logger.info("Found %d candidates:", len(candidates))
+                    for i, c in enumerate(candidates, 1):
+                        logger.info(
+                            "  %d. %s | Gap: %.1f%% | RVOL: %.1fx | Price: $%.2f%s",
+                            i, c.ticker, c.gap_pct * 100, c.rvol, c.current_price,
+                            f" | GEX_norm: {c.gex_normalized:.2f}" if c.gex_normalized is not None else "",
+                        )
+                else:
+                    logger.info("No candidates passed filters this iteration.")
+            else:
+                logger.info("No market data available. Market may be closed.")
+
+        except Exception as e:
+            logger.error("Scan iteration failed: %s", e)
+
+        if once:
+            break
+
+        # Wait for next interval or shutdown
+        try:
+            await asyncio.wait_for(shutdown.wait(), timeout=interval)
+        except asyncio.TimeoutError:
+            pass
+
+    logger.info("Scanner stopped after %d iterations.", iteration)
+
+
+async def _fetch_scan_quotes(client, settings: Settings) -> dict:
+    """
+    Fetch market snapshot data from Alpaca for scanner input.
+
+    Returns dict of ticker → {current_price, previous_close, premarket_volume, ...}
+    suitable for ScanLoop.run_single_scan().
+    """
+    try:
+        # Use Alpaca most-active or screener endpoint if available
+        # For now, fetch snapshots for a watchlist or most-active tickers
+        tickers = await client.get_most_active_tickers(limit=50)
+        if not tickers:
+            return {}
+
+        snapshots = await client.get_snapshots(tickers)
+        quotes = {}
+        for ticker, snap in snapshots.items():
+            try:
+                current = float(snap.get("latestTrade", {}).get("p", 0) or
+                               snap.get("minuteBar", {}).get("c", 0))
+                prev_close = float(snap.get("prevDailyBar", {}).get("c", 0))
+                volume = int(snap.get("minuteBar", {}).get("v", 0) or
+                            snap.get("dailyBar", {}).get("v", 0))
+                avg_vol = max(1, int(snap.get("prevDailyBar", {}).get("v", 1)))
+
+                if current > 0 and prev_close > 0:
+                    quotes[ticker] = {
+                        "current_price": current,
+                        "previous_close": prev_close,
+                        "premarket_volume": volume,
+                        "avg_volume_at_time": avg_vol,
+                        "float_shares": None,
+                        "market_cap": None,
+                        "has_news": True,  # Conservative: assume news may exist
+                    }
+            except (ValueError, TypeError, KeyError):
+                continue
+
+        return quotes
+
+    except Exception as e:
+        logger.warning("Failed to fetch scan quotes: %s", e)
+        return {}
 
 
 async def cmd_evaluate(settings: Settings) -> None:
@@ -280,6 +384,17 @@ def main() -> None:
         action="store_true",
         help="USE LIVE TRADING (requires confirmation). Default: paper.",
     )
+    parser.add_argument(
+        "--interval",
+        type=int,
+        default=30,
+        help="Scan polling interval in seconds (default: 30). Used with 'scan' command.",
+    )
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        help="Run scan once and exit (default: continuous polling).",
+    )
 
     args = parser.parse_args()
     setup_logging(args.verbose)
@@ -300,15 +415,16 @@ def main() -> None:
         settings.mode = "paper"
 
     # Dispatch to command handler
-    commands = {
-        "scan": cmd_scan,
-        "evaluate": cmd_evaluate,
-        "paper": cmd_paper,
-        "backtest": cmd_backtest,
-        "analyze": cmd_analyze,
-    }
-
-    asyncio.run(commands[args.command](settings))
+    if args.command == "scan":
+        asyncio.run(cmd_scan(settings, interval=args.interval, once=args.once))
+    else:
+        commands = {
+            "evaluate": cmd_evaluate,
+            "paper": cmd_paper,
+            "backtest": cmd_backtest,
+            "analyze": cmd_analyze,
+        }
+        asyncio.run(commands[args.command](settings))
 
 
 if __name__ == "__main__":

@@ -1,35 +1,33 @@
 {
-    "session": "S016",
-    "timestamp": "2026-02-02T14:00:00Z",
-    "state_reconstruction": "All priority debt from S015 RESOLVED. System is production-ready. Full pipeline: scan_loop → EMC filter → GEX enrichment → GEX hard filter → orchestrator → agents → MFCS → debate → risk veto → position_manager → close_hook → Shapley attribution → Elo update. Backtest gate: PBO < 0.10 AND DSR > 0.95. 412 tests, 30 nodes, 15 ADRs.",
+    "session": "S017",
+    "timestamp": "2026-02-02T15:00:00Z",
+    "state_reconstruction": "README.md fully rewritten to reflect S016 state: 415 tests, 30 nodes, 15 ADRs, 19 math sections. CLI live scan mode implemented with --interval and --once flags. ScanLoop integration wired into cmd_scan with graceful shutdown. All prior debt P1 (CLI live mode) resolved.",
     "completed_this_session": [
-        "IMPLEMENTED AlpacaOptionsProvider: Concrete OptionsDataProvider mapping Alpaca /v2/options/contracts to OptionsChainEntry. DTE ≤ 45d filter, OI > 0 filter, missing greeks → 0.0, API errors → empty chain.",
-        "IMPLEMENTED PositionManager.cache_scored_candidate() + close_position_with_attribution(): ScoredCandidate cached at entry, popped at close to build EnrichedTradeResult. Cache cleared on close. Graceful degradation for uncached positions.",
-        "IMPLEMENTED evaluate_strategy_acceptance(): Combined PBO+DSR gate. accepted = (PBO < 0.10) AND (DSR > 0.95). Returns structured dict with both components.",
-        "IMPLEMENTED ScanLoop: Single iteration orchestrator. quotes → Polars DataFrame → scan_premarket_gappers → GEX enrichment → should_reject_gex → CandidateStock list. Supports live GEX (options_provider → GEXCalculator) and test overrides.",
-        "VERIFIED Shapley Elo convergence: 500 simulated trades with dominant news_agent (scores 0.80-0.99) in proportional mode. news_agent Elo converges above tech_agent Elo. Symmetric agents (equal scores) stay within ±100 Elo.",
-        "DISCOVERED: threshold_aware Shapley gives equal φ to all pivotal agents (correct math for weighted majority games). Proportional mode required for score-magnitude differentiation in Elo updates.",
-        "CREATED ADR-015: Production Readiness documenting all 5 integration decisions + convergence insight."
+        "REWROTE README.md: Comprehensive documentation covering all subsystems — Shapley attribution, GEX filter, LLM-aware backtesting, DSR, combined gates, scan loop, prompt arena, risk management, mathematical foundations (19 sections), 15 ADRs, project structure, research bibliography, development protocol.",
+        "IMPLEMENTED CLI live scan mode: cmd_scan() with --interval (default 30s) and --once flags. Uses ScanLoop.run_single_scan(). Graceful SIGINT/SIGTERM shutdown. _fetch_scan_quotes() helper for Alpaca snapshot data.",
+        "ADDED 3 CLI tests: ScanLoop import, empty quotes handling, CLI parser accepts --interval/--once flags.",
+        "VERIFIED 415 tests passing with zero regression."
     ],
     "next_action": {
-        "priority_1": "IMPLEMENT CLI live mode: Click command 'momentum-x scan --live' that runs ScanLoop in a polling loop with configurable interval.",
-        "priority_2": "IMPLEMENT Alpaca order execution: Wire AlpacaExecutor to position_manager for real paper trading.",
-        "priority_3": "IMPLEMENT full backtest simulation: Use LLMAwareBacktestRunner + evaluate_strategy_acceptance() on historical data.",
-        "priority_4": "IMPLEMENT monitoring dashboard: Prometheus metrics for pipeline latency, agent Elo rankings, circuit breaker status.",
-        "priority_5": "IMPLEMENT replay mode: CachedAgentWrapper playback for deterministic backtest verification."
+        "priority_1": "IMPLEMENT Alpaca order execution wiring: Wire AlpacaExecutor.submit_bracket_order() to PositionManager.add_position(). Cache ScoredCandidate at entry for Shapley.",
+        "priority_2": "IMPLEMENT historical backtest simulation: Load historical data → run through LLMAwareBacktestRunner → evaluate_strategy_acceptance() → report.",
+        "priority_3": "IMPLEMENT monitoring: Prometheus metrics for pipeline latency, agent Elo rankings, circuit breaker status, GEX filter hit rate.",
+        "priority_4": "IMPLEMENT CachedAgentWrapper: Record agent responses during live trading, replay for deterministic backtesting.",
+        "priority_5": "IMPLEMENT intraday scanner: Extend ScanLoop for Phase 3 (10:00-15:45 ET) with VWAP breakout detection."
     },
     "cognitive_load": {
-        "production_architecture": "Full pipeline closed: ScanLoop.run_single_scan() → Orchestrator.evaluate_candidate() → PositionManager.add_position()+cache_scored_candidate() → ... → close_position_with_attribution() → PostTradeAnalyzer.analyze_with_shapley() → Arena Elo updates. Backtest gate: evaluate_strategy_acceptance(pbo, sharpe, N, T, skew, kurt) returns {accepted, pbo_pass, dsr_pass}.",
-        "shapley_mode_insight": "threshold_aware mode: weighted majority game, pivotality-based. All pivotal agents get equal φ regardless of score magnitude. Correct for understanding system behavior. proportional mode: linear v(S) = MFCS(S)/MFCS(N) × pnl. Score-proportional attribution. Correct for Elo differentiation. Production should use proportional for post-trade Elo.",
-        "options_provider_mapping": "Alpaca option_contracts[i] → OptionsChainEntry: strike_price→strike, type→option_type, open_interest→open_interest, greeks.gamma→gamma, implied_volatility→implied_volatility. expiration_date parsed to date object for DTE filter."
+        "readme_architecture": "README covers: architecture diagram (scan→GEX→agents→MFCS→debate→execute→Shapley→Elo), quickstart, 6 agents table, risk management (10 protections), 19 math sections table, Shapley attribution loop, GEX filter explanation, backtesting (3-layer protection), full project structure tree, testing summary, research bibliography (11 refs), 15 ADRs table, dev protocol, roadmap.",
+        "cli_live_mode": "cmd_scan(settings, interval, once): polling loop with ScanLoop.run_single_scan(). _fetch_scan_quotes(client, settings) → Alpaca snapshots → quotes dict. Graceful shutdown via asyncio.Event + SIGINT handler. --once flag for single iteration.",
+        "project_stats": "43 source files, 36 test files, 9335+ source LOC, 7546+ test LOC, 415 tests, 30 graph nodes, 15 ADRs, 19 math sections, 11 research references."
     },
-    "test_count": 412,
+    "test_count": 415,
     "unresolved_debt": [
-        "CLI live polling mode not yet implemented",
         "AlpacaExecutor not yet wired to PositionManager for real order execution",
         "No historical backtest simulation run yet (infrastructure ready but untested on real data)",
-        "No monitoring/observability dashboard",
+        "No monitoring/observability dashboard (Prometheus metrics)",
         "CachedAgentWrapper replay mode not yet integrated with BacktestRunner",
+        "Intraday scanner (Phase 3 VWAP breakout) not yet implemented",
+        "_fetch_scan_quotes uses rough Alpaca snapshot mapping (needs screener endpoint)",
         "ScanLoop._compute_live_gex uses rough ADV estimate (premarket_volume × 10)"
     ]
 }
