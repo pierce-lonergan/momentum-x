@@ -72,7 +72,7 @@ Momentum-X is an open-source algorithmic trading framework that uses **multiple 
 
 ```bash
 # 1. Clone
-git clone https://github.com/momentum-x/momentum-x.git
+git clone https://github.com/pierce-lonergan/momentum-x.git
 cd momentum-x
 
 # 2. Install
@@ -93,7 +93,7 @@ make paper
 ### Option B: Docker
 
 ```bash
-git clone https://github.com/momentum-x/momentum-x.git
+git clone https://github.com/pierce-lonergan/momentum-x.git
 cd momentum-x
 cp .env.example .env   # Edit with your keys
 docker compose up --build
@@ -218,7 +218,7 @@ Pre-commit hooks: secret detection, large file blocking, format enforcement.
 See [CONTRIBUTING.md](CONTRIBUTING.md). Quick start:
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/momentum-x.git
+git clone https://github.com/pierce-lonergan/momentum-x.git
 cd momentum-x && pip install -e ".[dev]" && pre-commit install && make test
 ```
 

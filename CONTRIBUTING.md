@@ -6,7 +6,7 @@ Thank you for your interest in contributing! This guide will help you get starte
 
 ```bash
 # 1. Fork and clone
-git clone https://github.com/YOUR_USERNAME/momentum-x.git
+git clone https://github.com/pierce-lonergan/momentum-x.git
 cd momentum-x
 
 # 2. Install dev dependencies
