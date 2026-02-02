@@ -1,0 +1,147 @@
+{
+  "protocol": "TOR-P",
+  "version": "S004",
+  "last_updated": "2026-02-02T03:00:00Z",
+
+  "nodes": {
+    "config.settings": {
+      "type": "CONFIG", "file": "config/settings.py", "status": "COMPLETE",
+      "description": "Type-safe pydantic-settings with all subsystem configs. SIP feed default (ADR-004)."
+    },
+    "core.models": {
+      "type": "MODEL", "file": "src/core/models.py", "status": "COMPLETE",
+      "description": "12 frozen Pydantic domain models + enums"
+    },
+    "core.scoring": {
+      "type": "ENGINE", "file": "src/core/scoring.py", "status": "COMPLETE",
+      "description": "MFCS computation engine. Ref: MOMENTUM_LOGIC.md §5",
+      "tested_by": "tests.unit.test_scoring"
+    },
+    "core.orchestrator": {
+      "type": "ENGINE", "file": "src/core/orchestrator.py", "status": "COMPLETE",
+      "description": "Full 6-agent pipeline: 5 analytical (parallel) → risk (sequential) → MFCS → debate → verdict",
+      "justified_by": ["ADR-001", "SYSTEM_ARCHITECTURE.md"],
+      "tested_by": "tests.integration.test_pipeline"
+    },
+    "core.backtester": {
+      "type": "ENGINE", "file": "src/core/backtester.py", "status": "COMPLETE",
+      "description": "CPCV backtesting engine with PBO calculation. Ref: REF-007, INV-001",
+      "tested_by": "tests.unit.test_backtester"
+    },
+    "scanner.premarket": {
+      "type": "SCANNER", "file": "src/scanners/premarket.py", "status": "COMPLETE",
+      "description": "Pre-market EMC scanner. Ref: MOMENTUM_LOGIC.md §1-4",
+      "tested_by": "tests.property.test_scanner_properties"
+    },
+    "agent.base": {
+      "type": "AGENT", "file": "src/agents/base.py", "status": "COMPLETE",
+      "description": "Abstract BaseAgent with litellm, JSON parsing, R1 handling"
+    },
+    "agent.news": {
+      "type": "AGENT", "file": "src/agents/news_agent.py", "status": "COMPLETE",
+      "description": "Catalyst classification. 5 hard invariants. Tier 1.",
+      "tested_by": "tests.unit.test_news_agent"
+    },
+    "agent.technical": {
+      "type": "AGENT", "file": "src/agents/technical_agent.py", "status": "COMPLETE",
+      "description": "Pattern recognition + breakout. Tier 2.",
+      "tested_by": "tests.unit.test_technical_agent"
+    },
+    "agent.fundamental": {
+      "type": "AGENT", "file": "src/agents/fundamental_agent.py", "status": "COMPLETE",
+      "description": "Float structure, short interest, dilution. Large float→NEUTRAL cap. Tier 2.",
+      "justified_by": ["MOMENTUM_LOGIC_§5", "DATA-001-EXT CONSTRAINT-009"],
+      "tested_by": "tests.unit.test_remaining_agents"
+    },
+    "agent.institutional": {
+      "type": "AGENT", "file": "src/agents/institutional_agent.py", "status": "COMPLETE",
+      "description": "Options flow, dark pool, insider activity. Multi-source required. Tier 2.",
+      "justified_by": ["MOMENTUM_LOGIC_§5", "REF-004"],
+      "tested_by": "tests.unit.test_remaining_agents"
+    },
+    "agent.deep_search": {
+      "type": "AGENT", "file": "src/agents/deep_search_agent.py", "status": "COMPLETE",
+      "description": "SEC/social/historical cross-reference. Confirmation only. Tier 2.",
+      "justified_by": ["MOMENTUM_LOGIC_§5"],
+      "tested_by": "tests.unit.test_remaining_agents"
+    },
+    "agent.risk": {
+      "type": "AGENT", "file": "src/agents/risk_agent.py", "status": "COMPLETE",
+      "description": "Adversarial veto + hard deterministic rules. Tier 1.",
+      "justified_by": ["ADR-001", "INV-008"],
+      "tested_by": "tests.unit.test_risk_agent"
+    },
+    "agent.debate_engine": {
+      "type": "ENGINE", "file": "src/agents/debate_engine.py", "status": "COMPLETE",
+      "description": "Bull/Bear/Judge debate. Divergence→position sizing.",
+      "justified_by": ["REF-001", "MOMENTUM_LOGIC_§10"],
+      "tested_by": "tests.unit.test_debate_engine"
+    },
+    "data.alpaca_client": {
+      "type": "DATA_CLIENT", "file": "src/data/alpaca_client.py", "status": "COMPLETE",
+      "description": "Alpaca REST: snapshots, volume profile, orders, PDT check, asset check, extended hours. Rate-limited (ADR-004).",
+      "justified_by": ["DATA-001", "DATA-001-EXT", "ADR-002", "ADR-004"],
+      "tested_by": "tests.unit.test_alpaca_client"
+    },
+    "data.news_client": {
+      "type": "DATA_CLIENT", "file": "src/data/news_client.py", "status": "COMPLETE",
+      "description": "Multi-source aggregation: Alpaca + Finnhub, 90% dedup."
+    },
+    "execution.alpaca_executor": {
+      "type": "EXECUTOR", "file": "src/execution/alpaca_executor.py", "status": "COMPLETE",
+      "description": "Stateless order adapter: verdict→bracket order, slippage tracking.",
+      "justified_by": ["DATA-001", "DATA-001-EXT CONSTRAINT-003"],
+      "tested_by": "tests.unit.test_executor"
+    },
+    "execution.position_manager": {
+      "type": "EXECUTOR", "file": "src/execution/position_manager.py", "status": "COMPLETE",
+      "description": "Circuit breaker, 3-tranche scaled exits, stop ratcheting, time stop.",
+      "justified_by": ["MOMENTUM_LOGIC_§6", "ADR-003"],
+      "tested_by": "tests.unit.test_executor"
+    },
+    "utils.rate_limiter": {
+      "type": "ENGINE", "file": "src/utils/rate_limiter.py", "status": "COMPLETE",
+      "description": "Token bucket rate limiter. Trading: 180/min, Data: 9000/min.",
+      "justified_by": ["ADR-004", "DATA-001-EXT CONSTRAINT-004"],
+      "tested_by": "tests.unit.test_rate_limiter"
+    },
+    "utils.trade_filter": {
+      "type": "ENGINE", "file": "src/utils/trade_filter.py", "status": "COMPLETE",
+      "description": "Trade condition code filter (Z,U,4,C excluded) + WebSocket symbol chunking (400/frame).",
+      "justified_by": ["ADR-004", "DATA-001-EXT CONSTRAINT-002", "DATA-001-EXT CONSTRAINT-005"],
+      "tested_by": "tests.unit.test_rate_limiter"
+    },
+    "cli.main": {
+      "type": "CONFIG", "file": "main.py", "status": "COMPLETE",
+      "description": "CLI entrypoint: scan, evaluate, paper, backtest modes. Live requires explicit confirmation.",
+      "justified_by": ["SYSTEM_ARCHITECTURE.md", "INV-007"]
+    }
+  },
+
+  "edges": [
+    {"from": "scanner.premarket", "to": "core.scoring", "type": "feeds_into"},
+    {"from": "agent.news", "to": "core.scoring", "type": "feeds_into"},
+    {"from": "agent.technical", "to": "core.scoring", "type": "feeds_into"},
+    {"from": "agent.fundamental", "to": "core.scoring", "type": "feeds_into"},
+    {"from": "agent.institutional", "to": "core.scoring", "type": "feeds_into"},
+    {"from": "agent.deep_search", "to": "core.scoring", "type": "feeds_into"},
+    {"from": "core.scoring", "to": "agent.debate_engine", "type": "feeds_into"},
+    {"from": "agent.debate_engine", "to": "agent.risk", "type": "feeds_into"},
+    {"from": "agent.risk", "to": "execution.alpaca_executor", "type": "vetoes"},
+    {"from": "data.alpaca_client", "to": "scanner.premarket", "type": "feeds_into"},
+    {"from": "data.news_client", "to": "agent.news", "type": "feeds_into"},
+    {"from": "config.settings", "to": "data.alpaca_client", "type": "configured_by"},
+    {"from": "utils.rate_limiter", "to": "data.alpaca_client", "type": "implements"},
+    {"from": "utils.trade_filter", "to": "data.alpaca_client", "type": "implements"},
+    {"from": "core.orchestrator", "to": "agent.news", "type": "dispatches"},
+    {"from": "core.orchestrator", "to": "agent.technical", "type": "dispatches"},
+    {"from": "core.orchestrator", "to": "agent.fundamental", "type": "dispatches"},
+    {"from": "core.orchestrator", "to": "agent.institutional", "type": "dispatches"},
+    {"from": "core.orchestrator", "to": "agent.deep_search", "type": "dispatches"},
+    {"from": "core.orchestrator", "to": "agent.risk", "type": "dispatches"},
+    {"from": "cli.main", "to": "core.orchestrator", "type": "depends_on"}
+  ],
+
+  "adrs": ["ADR-001", "ADR-002", "ADR-003", "ADR-004"],
+  "research_docs": ["BIBLIOGRAPHY.md", "ALPACA_API_CONSTRAINTS.md"]
+}

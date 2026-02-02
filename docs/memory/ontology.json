@@ -1,0 +1,76 @@
+{
+  "protocol": "TITAN-OMNE RECURSIVE (TOR-P)",
+  "version": "1.0.0",
+  "project": "MOMENTUM-X",
+
+  "invariants": {
+    "INV-001": {
+      "rule": "All strategies MUST pass Purged and Embargoed Cross-Validation (CPCV) before paper trading",
+      "source": "Lopez de Prado, Advances in Financial ML, Ch. 7 & 12",
+      "enforcement": "src/core/backtester.py — CPCV is the ONLY accepted validation method",
+      "pbo_threshold": 0.10
+    },
+    "INV-002": {
+      "rule": "Zero magic numbers — every constant must trace to a distribution analysis or research reference",
+      "enforcement": "Code review: grep for bare numeric literals without REF comments"
+    },
+    "INV-003": {
+      "rule": "All Python code must use Pydantic v2 models and full type hints",
+      "enforcement": "mypy --strict on CI"
+    },
+    "INV-004": {
+      "rule": "No code is written unless it maps to a Node in graph_state.json",
+      "enforcement": "Every module docstring must contain 'Node ID:' referencing the graph"
+    },
+    "INV-005": {
+      "rule": "No heuristic or formula is implemented without a Research Library justification",
+      "enforcement": "Every function with decision logic must cite a REF-ID in its docstring"
+    },
+    "INV-006": {
+      "rule": "Test-First: failing test must exist before implementation code",
+      "enforcement": "git log audit — test commits precede implementation commits"
+    },
+    "INV-007": {
+      "rule": "Mode defaults to PAPER. Live trading requires explicit override + 8-week paper profitability",
+      "enforcement": "config/settings.py mode='paper' default, AlpacaConfig base_url defaults to paper"
+    },
+    "INV-008": {
+      "rule": "Risk Agent has absolute veto power. No trade executes if Risk Agent signals VETO",
+      "enforcement": "src/core/orchestrator.py must check risk_signal.risk_verdict before execution"
+    },
+    "INV-009": {
+      "rule": "Maximum 5% portfolio per position (Half-Kelly cap)",
+      "enforcement": "config/settings.py ExecutionConfig.max_position_pct = 0.05"
+    },
+    "INV-010": {
+      "rule": "Every session MUST end with a SESSION_COMMIT updating graph_state.json and black_box.json",
+      "enforcement": "TOR-P Phase 4 is mandatory"
+    }
+  },
+
+  "entity_taxonomy": {
+    "description": "Valid node types for graph_state.json",
+    "types": [
+      "SCANNER",
+      "AGENT",
+      "ENGINE",
+      "DATA_CLIENT",
+      "EXECUTOR",
+      "MODEL",
+      "FORMULA",
+      "CONFIG",
+      "TEST_SUITE"
+    ]
+  },
+
+  "relationship_types": [
+    "implements",
+    "justified_by",
+    "depends_on",
+    "tested_by",
+    "feeds_into",
+    "configured_by",
+    "vetoes",
+    "debates_with"
+  ]
+}

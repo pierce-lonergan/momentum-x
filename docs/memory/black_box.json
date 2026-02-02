@@ -1,0 +1,115 @@
+{
+  "protocol": "TOR-P",
+  "session_id": "S004_ALPACA_INTEGRATION",
+  "timestamp": "2026-02-02T03:00:00Z",
+
+  "resumption_vector": {
+    "completed_this_session": [
+      "docs/research/ALPACA_API_CONSTRAINTS.md — 12 constraints catalogued from API reference",
+      "ADR-004 — Rate limiting, SIP enforcement, condition code filtering, WebSocket chunking",
+      "utils.rate_limiter — Token bucket: 180 req/min trading, 9000 req/min market data",
+      "utils.trade_filter — Condition code filter (Z,U,4,C excluded) + chunk_symbols(400/frame)",
+      "agent.fundamental — Float structure, dilution risk. Large float→NEUTRAL cap",
+      "agent.institutional — Options/dark pool flow. Multi-source required for STRONG_BULL",
+      "agent.deep_search — SEC/social/historical cross-reference. Confirmation only",
+      "data.alpaca_client HARDENED — rate limiters integrated, PDT check, asset check, extended hours",
+      "core.orchestrator UPGRADED — all 6 agents in 2-phase dispatch",
+      "main.py — CLI entrypoint: scan, evaluate, paper, backtest modes",
+      "Integration tests fixed for 6-agent pipeline",
+      "26 new tests (109 total, all passing)"
+    ],
+    "immediate_next": {
+      "file": "src/data/websocket_client.py",
+      "line": 1,
+      "task": "Implement Alpaca WebSocket streaming for real-time trades/quotes/bars with condition code filtering and reconnection"
+    },
+    "secondary_targets": [
+      "src/agents/prompt_arena.py — Elo rating tournament (H-003)",
+      "src/scanners/float_scanner.py — SEC EDGAR float cross-reference (H-004)",
+      "src/data/sec_client.py — SEC EDGAR/EFTS client for 10-K/8-K/S-3 filings",
+      "Real VWAP computation from minute bars (H-006)",
+      "Fix datetime.utcnow() deprecation warnings in TradeVerdict defaults"
+    ]
+  },
+
+  "unresolved_hypotheses": {
+    "H-001": {"status": "RESOLVED"},
+    "H-002": {"status": "OPEN", "statement": "R1 JSON reliability", "blocking": "Live LLM test"},
+    "H-003": {"status": "OPEN", "statement": "Arena cold start", "blocking": "prompt_arena.py"},
+    "H-004": {"status": "OPEN", "statement": "Float data freshness", "blocking": "float_scanner.py"},
+    "H-005": {"status": "RESOLVED"},
+    "H-006": {"status": "OPEN", "statement": "VWAP approximated", "blocking": "websocket_client minute bar aggregation"},
+    "H-007": {"status": "RESOLVED"},
+    "H-008": {
+      "status": "NEW",
+      "statement": "Alpaca bracket orders cannot use trailing_stop legs (CONSTRAINT-003). Manual trailing via trade_updates WebSocket required.",
+      "blocking": "websocket_client.py trade_updates listener",
+      "workaround": "position_manager._ratchet_stop() implements manual stop ratcheting, but needs WebSocket fill events to trigger"
+    },
+    "H-009": {
+      "status": "NEW",
+      "statement": "Paper trading infinite liquidity assumption (CONSTRAINT-006). Large orders fill instantly at last price with no slippage.",
+      "blocking": "backtester synthetic slippage model",
+      "workaround": "executor.OrderResult already tracks signal_price vs fill_price gap"
+    }
+  },
+
+  "cognitive_load": {
+    "critical_context": [
+      "ALL 6 AGENTS OPERATIONAL: news(T1), technical(T2), fundamental(T2), institutional(T2), deep_search(T2), risk(T1)",
+      "FULL PIPELINE: Scanner→5 analytical(parallel)→risk(sequential)→MFCS→Debate(if>0.6)→Verdict",
+      "Rate limiter: Trading 180/min (token bucket), Market Data 9000/min. Integrated into alpaca_client.",
+      "Trade condition filter: Regular session excludes Z,U,T,4,C,I,W. Pre-market allows U,T but excludes Z,4,C.",
+      "WebSocket chunking: 400 symbols/frame (under 16KB limit per CONSTRAINT-005)",
+      "New Alpaca features: check_pdt_status(), check_asset_tradable(), submit_extended_hours_order()",
+      "CLI: python -m main {scan|evaluate|paper|backtest}. Live requires typed confirmation.",
+      "BRACKET TRAILING STOP BUG (H-008): Alpaca can't do trailing in brackets. Must listen for fills on WebSocket."
+    ],
+    "architectural_debt": [
+      "H-006: VWAP still approximated as price*0.98 in orchestrator",
+      "H-008: No WebSocket client yet — all data is REST polling",
+      "H-009: Backtester needs synthetic slippage model for paper trading gap",
+      "No float_scanner.py (H-004) or SEC client",
+      "Prompt Arena not built (H-003)",
+      "datetime.utcnow() deprecation warnings in Pydantic defaults"
+    ]
+  },
+
+  "test_state": {
+    "total": 109,
+    "passing": 109,
+    "failing": 0,
+    "suites": {
+      "tests/property/test_scanner_properties.py": 19,
+      "tests/unit/test_scoring.py": 9,
+      "tests/unit/test_alpaca_client.py": 6,
+      "tests/unit/test_news_agent.py": 7,
+      "tests/unit/test_risk_agent.py": 7,
+      "tests/unit/test_debate_engine.py": 7,
+      "tests/unit/test_executor.py": 10,
+      "tests/unit/test_backtester.py": 10,
+      "tests/unit/test_technical_agent.py": 5,
+      "tests/unit/test_remaining_agents.py": 11,
+      "tests/unit/test_rate_limiter.py": 14,
+      "tests/integration/test_pipeline.py": 2
+    }
+  },
+
+  "files_created_this_session": [
+    "docs/research/ALPACA_API_CONSTRAINTS.md",
+    "docs/decisions/ADR_004_RATE_LIMITING_AND_DATA_FEED.md",
+    "src/utils/rate_limiter.py",
+    "src/utils/trade_filter.py",
+    "src/agents/fundamental_agent.py",
+    "src/agents/institutional_agent.py",
+    "src/agents/deep_search_agent.py",
+    "main.py",
+    "tests/unit/test_rate_limiter.py",
+    "tests/unit/test_remaining_agents.py"
+  ],
+  "files_modified_this_session": [
+    "src/data/alpaca_client.py (rate limiter + PDT + asset + extended hours)",
+    "src/core/orchestrator.py (6-agent dispatch + 3 new agent imports)",
+    "tests/integration/test_pipeline.py (6-agent mock setup)"
+  ]
+}

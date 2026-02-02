@@ -1,0 +1,40 @@
+# MOMENTUM-X Dependencies
+# Protocol: TR-P — all deps must be justified in docs/decisions/
+
+# === Core ===
+polars>=1.0.0            # Sub-ms DataFrame ops (ADR-001: latency requirement)
+httpx[http2]>=0.27.0     # Async HTTP client with HTTP/2
+websockets>=13.0         # Alpaca WebSocket streams
+pydantic>=2.6.0          # Domain model validation
+pydantic-settings>=2.2.0 # Type-safe configuration
+
+# === LLM Integration ===
+litellm>=1.40.0          # Unified LLM API (DeepSeek, Qwen, Llama via Together/Fireworks)
+openai>=1.30.0           # Fallback direct API client
+tiktoken>=0.7.0          # Token counting for cost estimation
+
+# === Broker ===
+alpaca-py>=0.30.0        # Alpaca Trading + Market Data SDK
+
+# === Data ===
+aiohttp>=3.9.0           # Async HTTP for multiple data sources
+aiosqlite>=0.20.0        # Async SQLite for dev
+redis>=5.0.0             # Pub/sub + caching (production)
+
+# === Analysis ===
+numpy>=1.26.0            # Numerical computation
+scipy>=1.12.0            # Statistical functions (CPCV)
+ta>=0.11.0               # Technical analysis indicators
+
+# === Testing ===
+pytest>=8.0.0            # Test runner
+pytest-asyncio>=0.23.0   # Async test support
+hypothesis>=6.98.0       # Property-based testing (TR-P §II)
+pytest-cov>=5.0.0        # Coverage reporting
+
+# === Scheduling ===
+apscheduler>=3.10.0      # Market phase transition scheduling
+
+# === Observability ===
+structlog>=24.1.0        # Structured logging
+rich>=13.7.0             # Terminal output formatting
