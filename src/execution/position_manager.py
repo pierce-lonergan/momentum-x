@@ -103,6 +103,7 @@ class PositionManager:
         self._starting_equity = starting_equity
         self._daily_realized_pnl: float = 0.0
         self._positions: dict[str, ManagedPosition] = {}
+        self._scored_cache: dict[str, Any] = {}  # ticker → ScoredCandidate
 
     @property
     def is_circuit_breaker_active(self) -> bool:
@@ -227,3 +228,95 @@ class PositionManager:
         """Reset daily P&L tracking at market open."""
         self._daily_realized_pnl = 0.0
         logger.info("Daily P&L reset to $0.00")
+
+    # ── ScoredCandidate Cache (ADR-014: Pipeline Closure) ────────
+
+    def cache_scored_candidate(self, ticker: str, scored: Any) -> None:
+        """
+        Cache a ScoredCandidate at entry time for Shapley attribution at close.
+
+        Called by the orchestrator after MFCS scoring, before position entry.
+        The cached data (component_scores, mfcs, debate_triggered) is used
+        to construct EnrichedTradeResult when the position is closed.
+
+        Args:
+            ticker: Stock symbol.
+            scored: ScoredCandidate from MFCS computation.
+
+        Ref: ADR-014 (Pipeline Closure, D1)
+        """
+        self._scored_cache[ticker] = scored
+        logger.debug("Cached ScoredCandidate for %s (MFCS=%.3f)", ticker, scored.mfcs)
+
+    def get_cached_scored(self, ticker: str) -> Any | None:
+        """Retrieve cached ScoredCandidate for a ticker, or None."""
+        return self._scored_cache.get(ticker)
+
+    def close_position_with_attribution(
+        self,
+        ticker: str,
+        exit_price: float,
+        exit_time: datetime,
+        agent_signals_map: dict[str, str],
+        variant_map: dict[str, str],
+    ) -> Any | None:
+        """
+        Close a position and build EnrichedTradeResult for Shapley attribution.
+
+        Requires a previously cached ScoredCandidate from entry time.
+        If no cache exists, returns None (graceful degradation — old trades
+        opened before the caching system was deployed won't have Shapley data).
+
+        The returned EnrichedTradeResult can be passed directly to:
+            PostTradeAnalyzer.analyze_with_shapley(enriched, attributor)
+
+        Args:
+            ticker: Stock symbol to close.
+            exit_price: Fill price at exit.
+            exit_time: When position was closed.
+            agent_signals_map: agent_id → signal direction at entry.
+            variant_map: agent_id → variant_id from arena selection.
+
+        Returns:
+            EnrichedTradeResult if cache exists, None otherwise.
+
+        Ref: ADR-014 (Pipeline Closure)
+        Ref: MOMENTUM_LOGIC.md §17 (Shapley Attribution)
+        """
+        scored = self._scored_cache.pop(ticker, None)
+        if scored is None:
+            logger.warning(
+                "No cached ScoredCandidate for %s — Shapley attribution unavailable",
+                ticker,
+            )
+            return None
+
+        # Remove from active positions
+        position = self.remove_position(ticker)
+        if position:
+            pnl = (exit_price - position.entry_price) * position.qty
+            self.record_realized_pnl(pnl)
+
+        # Build EnrichedTradeResult
+        from src.analysis.shapley import EnrichedTradeResult
+
+        enriched = EnrichedTradeResult(
+            ticker=ticker,
+            entry_price=scored.candidate.current_price,
+            exit_price=exit_price,
+            entry_time=scored.candidate.scan_timestamp,
+            exit_time=exit_time,
+            agent_variants=variant_map,
+            agent_signals=agent_signals_map,
+            agent_component_scores=dict(scored.component_scores),
+            mfcs_at_entry=scored.mfcs,
+            risk_score=scored.risk_score,
+            debate_triggered=scored.qualifies_for_debate,
+        )
+
+        logger.info(
+            "Closed %s with Shapley attribution: PnL=%.2f, MFCS=%.3f",
+            ticker, enriched.pnl, enriched.mfcs_at_entry,
+        )
+
+        return enriched

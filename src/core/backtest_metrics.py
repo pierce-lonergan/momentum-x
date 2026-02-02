@@ -215,3 +215,71 @@ def compute_deflated_sharpe(
     dsr = _standard_normal_cdf(z)
 
     return dsr
+
+
+def evaluate_strategy_acceptance(
+    pbo: float,
+    observed_sharpe: float,
+    num_trials: int,
+    returns_length: int,
+    skewness: float = 0.0,
+    kurtosis: float = 3.0,
+    pbo_threshold: float = 0.10,
+    dsr_threshold: float = 0.95,
+) -> dict[str, float | bool]:
+    """
+    Combined strategy acceptance gate: PBO + DSR.
+
+    A strategy is accepted if and only if:
+        1. PBO < pbo_threshold (INV-001: The 90% Rule)
+        2. DSR > dsr_threshold (§18.4: Deflated Sharpe correction)
+
+    Both conditions must hold simultaneously. This prevents:
+    - PBO alone missing multiple testing bias
+    - DSR alone missing overfitting to training data
+
+    Args:
+        pbo: Probability of Backtest Overfitting from CPCV.
+        observed_sharpe: Annualized Sharpe ratio from best-performing path.
+        num_trials: Number of strategies/configurations tested.
+        returns_length: Number of return observations.
+        skewness: Sample skewness of returns.
+        kurtosis: Sample kurtosis of returns.
+        pbo_threshold: Maximum acceptable PBO (default 0.10 per INV-001).
+        dsr_threshold: Minimum acceptable DSR (default 0.95).
+
+    Returns:
+        Dict with keys:
+            accepted: True if strategy passes both gates.
+            pbo: The PBO value.
+            pbo_pass: True if PBO < threshold.
+            dsr: The DSR value.
+            dsr_pass: True if DSR > threshold.
+            pbo_threshold: The threshold used.
+            dsr_threshold: The threshold used.
+
+    Ref: Bailey & Lopez de Prado (2014) — "The Deflated Sharpe Ratio"
+    Ref: Lopez de Prado (2018) — "Advances in Financial ML", Ch. 12
+    Ref: MOMENTUM_LOGIC.md §18.4, §18.5
+    """
+    dsr = compute_deflated_sharpe(
+        observed_sharpe=observed_sharpe,
+        num_trials=num_trials,
+        returns_length=returns_length,
+        skewness=skewness,
+        kurtosis=kurtosis,
+    )
+
+    pbo_pass = pbo < pbo_threshold
+    dsr_pass = dsr > dsr_threshold
+    accepted = pbo_pass and dsr_pass
+
+    return {
+        "accepted": accepted,
+        "pbo": pbo,
+        "pbo_pass": pbo_pass,
+        "dsr": dsr,
+        "dsr_pass": dsr_pass,
+        "pbo_threshold": pbo_threshold,
+        "dsr_threshold": dsr_threshold,
+    }
