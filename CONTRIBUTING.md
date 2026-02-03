@@ -6,11 +6,7 @@ Thank you for your interest in contributing! This guide will help you get starte
 
 ```bash
 # 1. Fork and clone
-<<<<<<< HEAD
 git clone https://github.com/pierce-lonergan/momentum-x.git
-=======
-git clone https://github.com/YOUR_USERNAME/momentum-x.git
->>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
 cd momentum-x
 
 # 2. Install dev dependencies

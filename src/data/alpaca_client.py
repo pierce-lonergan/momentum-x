@@ -370,6 +370,100 @@ class AlpacaDataClient:
             "shortable": asset.get("shortable", False),
         }
 
+    async def submit_limit_order(
+        self,
+        symbol: str,
+        qty: int,
+        side: str,
+        limit_price: float,
+        time_in_force: str = "day",
+    ) -> dict[str, Any]:
+        """
+        Submit a limit order (for tranche exits).
+
+        Args:
+            symbol: Stock symbol.
+            qty: Number of shares.
+            side: 'buy' or 'sell'.
+            limit_price: Limit price.
+            time_in_force: 'day', 'gtc', 'ioc', etc.
+
+        Returns:
+            Alpaca order response dict with 'id', 'status', etc.
+
+        Ref: ADR-003 §2 (Scaled Exits via limit orders)
+        """
+        payload = {
+            "symbol": symbol,
+            "qty": str(qty),
+            "side": side,
+            "type": "limit",
+            "limit_price": str(limit_price),
+            "time_in_force": time_in_force,
+        }
+        return await self._trading_post(
+            f"{self._trade_base}/v2/orders", payload
+        )
+
+    async def cancel_order(self, order_id: str) -> dict[str, Any] | None:
+        """
+        Cancel an open order by ID.
+
+        Returns:
+            Empty dict on success (204), None on failure.
+
+        Ref: ADR-003 §2 (Stop ratcheting requires cancel + resubmit)
+        """
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                await self._trading_limiter.acquire()
+                resp = await client.delete(
+                    f"{self._trade_base}/v2/orders/{order_id}",
+                    headers=self._headers,
+                )
+                if resp.status_code in (200, 204):
+                    return {}
+                resp.raise_for_status()
+                return resp.json()
+        except Exception as e:
+            logger.warning("Failed to cancel order %s: %s", order_id, e)
+            return None
+
+    async def submit_stop_order(
+        self,
+        symbol: str,
+        qty: int,
+        side: str,
+        stop_price: float,
+        time_in_force: str = "day",
+    ) -> dict[str, Any]:
+        """
+        Submit a stop order (for ratcheted stop-loss after tranche fill).
+
+        Args:
+            symbol: Stock symbol.
+            qty: Number of shares.
+            side: 'buy' or 'sell'.
+            stop_price: Trigger price for the stop order.
+            time_in_force: 'day', 'gtc', etc.
+
+        Returns:
+            Alpaca order response dict with 'id', 'status', etc.
+
+        Ref: ADR-003 §2 (Stop ratcheting via cancel + resubmit)
+        """
+        payload = {
+            "symbol": symbol,
+            "qty": str(qty),
+            "side": side,
+            "type": "stop",
+            "stop_price": str(stop_price),
+            "time_in_force": time_in_force,
+        }
+        return await self._trading_post(
+            f"{self._trade_base}/v2/orders", payload
+        )
+
     async def submit_extended_hours_order(
         self,
         symbol: str,
