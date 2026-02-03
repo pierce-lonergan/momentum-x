@@ -126,6 +126,85 @@ class Orchestrator:
             temperature=settings.models.default_temperature,
         )
 
+    def wrap_agents_for_replay(self, agent_caches: dict[str, dict]) -> None:
+        """
+        Wrap all analytical agents with CachedAgentWrapper in REPLAY mode.
+
+        For deterministic backtesting: wraps each agent so that
+        analyze() returns cached responses instead of calling the LLM API.
+
+        Args:
+            agent_caches: Dict of agent_id → cache dict.
+                Each cache dict maps cache_key → serialized AgentSignal.
+
+        Usage:
+            caches = json.loads(Path("data/agent_cache.json").read_text())
+            orchestrator.wrap_agents_for_replay(caches)
+            # Now evaluate_candidate() uses cached responses — zero API calls
+
+        Ref: ADR-016 (D2: CachedAgentWrapper)
+        """
+        from src.agents.cached_wrapper import CachedAgentWrapper
+
+        agent_map = {
+            "news_agent": "_news_agent",
+            "technical_agent": "_technical_agent",
+            "fundamental_agent": "_fundamental_agent",
+            "institutional_agent": "_institutional_agent",
+            "deep_search_agent": "_deep_search_agent",
+            "risk_agent": "_risk_agent",
+        }
+
+        for agent_id, attr_name in agent_map.items():
+            cache = agent_caches.get(agent_id, {})
+            current_agent = getattr(self, attr_name)
+            wrapper = CachedAgentWrapper(
+                agent=current_agent,
+                mode="replay",
+                cache=cache,
+            )
+            setattr(self, attr_name, wrapper)
+            logger.info(
+                "Wrapped %s with CachedAgentWrapper (REPLAY, %d entries)",
+                agent_id, len(cache),
+            )
+
+    def wrap_agents_for_recording(self) -> dict[str, Any]:
+        """
+        Wrap all analytical agents with CachedAgentWrapper in RECORD mode.
+
+        For capturing live responses to build a replay cache.
+        Returns the wrapper dict so caches can be saved after the session.
+
+        Returns:
+            Dict of agent_id → CachedAgentWrapper (in RECORD mode).
+
+        Ref: ADR-016 (D2: CachedAgentWrapper)
+        """
+        from src.agents.cached_wrapper import CachedAgentWrapper
+
+        agent_map = {
+            "news_agent": "_news_agent",
+            "technical_agent": "_technical_agent",
+            "fundamental_agent": "_fundamental_agent",
+            "institutional_agent": "_institutional_agent",
+            "deep_search_agent": "_deep_search_agent",
+            "risk_agent": "_risk_agent",
+        }
+
+        wrappers: dict[str, Any] = {}
+        for agent_id, attr_name in agent_map.items():
+            current_agent = getattr(self, attr_name)
+            wrapper = CachedAgentWrapper(
+                agent=current_agent,
+                mode="record",
+            )
+            setattr(self, attr_name, wrapper)
+            wrappers[agent_id] = wrapper
+            logger.info("Wrapped %s with CachedAgentWrapper (RECORD)", agent_id)
+
+        return wrappers
+
     async def evaluate_candidate(
         self,
         candidate: CandidateStock,

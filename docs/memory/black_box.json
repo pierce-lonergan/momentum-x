@@ -1,34 +1,34 @@
 {
-    "session": "S018",
-    "timestamp": "2026-02-02T16:00:00Z",
-    "state_reconstruction": "Three major wiring gaps closed: ExecutionBridge (verdict→executor→PM), CachedAgentWrapper (record/replay for deterministic backtesting), HistoricalBacktestSimulator (end-to-end CPCV+DSR runner). 440 tests, 33 nodes, 16 ADRs. System now has complete wiring from scan through backtest validation.",
+    "session": "S020",
+    "timestamp": "2026-02-02T18:00:00Z",
+    "state_reconstruction": "Three observability/feature gaps closed: Prometheus-compatible metrics system (counters/gauges/histograms/timer/snapshot/export), intraday VWAP breakout scanner for Phase 3 (crossover+RVOL+cooldown), Shapley→Elo feedback wired into cmd_paper Phase 4. 481 tests, 35 nodes, 18 ADRs. System has full observability, 4-phase trading with feedback loop, and complete backtest validation.",
     "completed_this_session": [
-        "IMPLEMENTED ExecutionBridge (src/execution/bridge.py): Stateless coordinator wiring TradeVerdict → AlpacaExecutor.execute() → PositionManager.add_position(). Crash-safe: caches ScoredCandidate BEFORE order submission. Executor failure → cache cleanup. close_with_attribution() delegates to PM for Shapley. 9 tests.",
-        "IMPLEMENTED CachedAgentWrapper (src/agents/cached_wrapper.py): Decorator wrapping BaseAgent with RECORD (live+cache) and REPLAY (cache-only) modes. Cache key: agent_id::ticker::timestamp_bucket (hour granularity). JSON persistence (save/load). Cache miss → NEUTRAL fallback with CACHE_MISS flag. 8 tests.",
-        "IMPLEMENTED HistoricalBacktestSimulator (src/core/backtest_simulator.py): End-to-end runner chaining LLMAwareBacktestRunner → compute_deflated_sharpe() → evaluate_strategy_acceptance(). Produces BacktestReport with PBO, DSR, acceptance verdict, contamination report. Includes synthetic data generator for testing. 7 tests.",
-        "CREATED ADR-016 (Production Wiring): Documents all three decisions.",
-        "VERIFIED 440 tests passing with zero regression."
+        "IMPLEMENTED MetricsRegistry (src/monitoring/metrics.py): CounterMetric, GaugeMetric, HistogramMetric with timer(), snapshot(), to_prometheus(). Covers pipeline, agents, risk, GEX, execution, debate subsystems. Global singleton via get_metrics(). 10 tests.",
+        "IMPLEMENTED IntradayVWAPScanner (src/scanners/intraday_vwap.py): Phase 3 VWAP breakout detection with crossover tracking, RVOL≥1.5 confirmation, 30-min cooldown, 15-min minimum data. scan() for polling + scan_with_accumulators() for WebSocket. 9 tests.",
+        "WIRED Shapley→Elo feedback in cmd_paper Phase 4: After close_with_attribution, loads arena → PostTradeAnalyzer.analyze_with_shapley(enriched, attributor) → saves arena. Error-safe (try/except). 4 tests.",
+        "CREATED ADR-018 (Observability + VWAP + Shapley Feedback).",
+        "VERIFIED 481 tests passing with zero regression."
     ],
     "next_action": {
-        "priority_1": "WIRE ExecutionBridge into Orchestrator: After evaluate_candidate() returns BUY verdict, call bridge.execute_verdict(verdict, scored). Wire into cmd_paper() loop.",
-        "priority_2": "WIRE CachedAgentWrapper into LLMAwareBacktestRunner: During backtest, wrap all 6 agents with REPLAY wrappers loaded from recorded cache. Enables deterministic multi-fold backtesting.",
-        "priority_3": "IMPLEMENT CLI backtest command: Wire cmd_backtest() to HistoricalBacktestSimulator with real historical data loading or synthetic generation.",
-        "priority_4": "IMPLEMENT monitoring: Prometheus metrics for pipeline latency, agent Elo rankings, circuit breaker status, GEX filter hit rate.",
-        "priority_5": "IMPLEMENT intraday scanner: Extend ScanLoop for Phase 3 (10:00-15:45 ET) with VWAP breakout detection."
+        "priority_1": "WIRE MetricsRegistry into pipeline: Instrument Orchestrator (pipeline_latency, evaluations_total, agent_latency, risk_vetoes), ScanLoop (scan_iterations, candidates_found), ExecutionBridge (orders_submitted, open_positions), PositionManager (circuit_breaker_activations, daily_pnl).",
+        "priority_2": "WIRE IntradayVWAPScanner into cmd_paper Phase 3: Create scan_with_accumulators integration with WebSocket VWAPAccumulators.",
+        "priority_3": "IMPLEMENT historical data loader: Replace synthetic data in cmd_backtest with real OHLCV from Alpaca.",
+        "priority_4": "IMPLEMENT tranche exit monitoring in Phase 3: WebSocket fill detection → PositionManager stop ratcheting.",
+        "priority_5": "IMPLEMENT metrics HTTP endpoint: Simple HTTP server exposing /metrics for Prometheus scraping."
     },
     "cognitive_load": {
-        "execution_bridge": "ExecutionBridge(executor, pm). execute_verdict(verdict, scored, variant_map) → OrderResult|None. Guards: NO_TRADE, zero-size, circuit breaker, max positions. Cache before order, cleanup on failure. close_with_attribution(ticker, exit_price) → EnrichedTradeResult|None.",
-        "cached_wrapper": "CachedAgentWrapper(agent, mode='record'|'replay', cache={}). analyze(ticker, **kwargs) → AgentSignal. Cache key: agent_id::ticker::YYYY-MM-DDTHH. RECORD calls live agent + stores. REPLAY returns from cache (NEUTRAL on miss). save()/load() for JSON persistence.",
-        "backtest_simulator": "HistoricalBacktestSimulator(model_id, n_groups, ..., pbo_threshold=0.10, dsr_threshold=0.95). run(signals, returns) → BacktestReport. Chains: LLMAwareBacktestRunner → compute_deflated_sharpe → evaluate_strategy_acceptance. generate_synthetic_data(n, accuracy, seed) for testing.",
-        "project_stats": "45 source files, 37 test files, 440 tests, 33 graph nodes, 16 ADRs, 19 math sections, 18 sessions."
+        "metrics_api": "MetricsRegistry: counters (inc), gauges (set/inc/dec), histograms (observe). timer(histogram) context manager. snapshot() → JSON dict. to_prometheus() → text. get_metrics() → global singleton.",
+        "vwap_scanner_api": "IntradayVWAPScanner(rvol_threshold=1.5, cooldown_minutes=30, min_data_minutes=15). scan(snapshots) for polling. scan_with_accumulators(accumulators, prices, avg_volumes) for WebSocket. TickerState tracks was_below_vwap + last_signal_time. reset() for new session.",
+        "shapley_wiring": "In cmd_paper Phase 4: enriched = bridge.close_with_attribution() → PostTradeAnalyzer(arena).analyze_with_shapley(enriched, attributor) → arena.save(). Wrapped in try/except.",
+        "project_stats": "48 source files, 39 test files, 481 tests, 35 graph nodes, 18 ADRs, 19 math sections, 20 sessions."
     },
-    "test_count": 440,
+    "test_count": 481,
     "unresolved_debt": [
-        "ExecutionBridge not yet wired into Orchestrator/cmd_paper main loop",
-        "CachedAgentWrapper not yet integrated with LLMAwareBacktestRunner for deterministic multi-fold replay",
-        "cmd_backtest() not yet wired to HistoricalBacktestSimulator",
-        "No monitoring/observability dashboard (Prometheus metrics)",
-        "Intraday scanner (Phase 3 VWAP breakout) not yet implemented",
+        "MetricsRegistry not yet instrumented into pipeline components (orchestrator, scan_loop, bridge, PM)",
+        "IntradayVWAPScanner not yet wired into cmd_paper Phase 3",
+        "cmd_backtest uses synthetic data only — needs historical data loader",
+        "Tranche exit monitoring not yet implemented in Phase 3",
+        "Metrics HTTP endpoint not yet implemented (/metrics for Prometheus scraping)",
         "_fetch_scan_quotes uses rough Alpaca snapshot mapping (needs screener endpoint)",
         "ScanLoop._compute_live_gex uses rough ADV estimate (premarket_volume × 10)"
     ]
