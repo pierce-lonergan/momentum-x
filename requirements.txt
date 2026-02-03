@@ -38,3 +38,7 @@ apscheduler>=3.10.0      # Market phase transition scheduling
 # === Observability ===
 structlog>=24.1.0        # Structured logging
 rich>=13.7.0             # Terminal output formatting
+<<<<<<< HEAD
+=======
+pyyaml
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)

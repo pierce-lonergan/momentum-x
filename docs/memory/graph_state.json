@@ -1,7 +1,12 @@
 {
     "protocol": "TOR-P",
+<<<<<<< HEAD
     "version": "S020",
     "last_updated": "2026-02-02T18:00:00Z",
+=======
+    "version": "S026",
+    "last_updated": "2026-02-03T09:00:00Z",
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
     "nodes": {
         "config.settings": {"type": "CONFIG", "file": "config/settings.py", "status": "COMPLETE"},
         "core.models": {"type": "MODEL", "file": "src/core/models.py", "status": "COMPLETE"},
@@ -16,7 +21,11 @@
         "scanner.premarket": {"type": "SCANNER", "file": "src/scanners/premarket.py", "status": "COMPLETE"},
         "scanner.gex": {"type": "SCANNER", "file": "src/scanners/gex.py", "status": "COMPLETE"},
         "scanner.gex_filter": {"type": "SCANNER", "file": "src/scanners/gex_filter.py", "status": "COMPLETE"},
+<<<<<<< HEAD
         "scanner.intraday_vwap": {"type": "SCANNER", "file": "src/scanners/intraday_vwap.py", "status": "COMPLETE", "note": "S020: Phase 3 VWAP breakout with crossover + RVOL + cooldown"},
+=======
+        "scanner.intraday_vwap": {"type": "SCANNER", "file": "src/scanners/intraday_vwap.py", "status": "COMPLETE"},
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
         "agent.base": {"type": "AGENT", "file": "src/agents/base.py", "status": "COMPLETE"},
         "agent.news": {"type": "AGENT", "file": "src/agents/news_agent.py", "status": "COMPLETE"},
         "agent.technical": {"type": "AGENT", "file": "src/agents/technical_agent.py", "status": "COMPLETE"},
@@ -29,12 +38,21 @@
         "agent.cached_wrapper": {"type": "AGENT", "file": "src/agents/cached_wrapper.py", "status": "COMPLETE"},
         "analysis.post_trade": {"type": "ANALYSIS", "file": "src/analysis/post_trade.py", "status": "COMPLETE"},
         "analysis.shapley": {"type": "ANALYSIS", "file": "src/analysis/shapley.py", "status": "COMPLETE"},
+<<<<<<< HEAD
         "data.alpaca_client": {"type": "CLIENT", "file": "src/data/alpaca_client.py", "status": "COMPLETE"},
         "data.options_provider": {"type": "CLIENT", "file": "src/data/options_provider.py", "status": "COMPLETE"},
+=======
+        "analysis.session_report": {"type": "ANALYSIS", "file": "src/analysis/session_report.py", "status": "COMPLETE"},
+        "data.alpaca_client": {"type": "CLIENT", "file": "src/data/alpaca_client.py", "status": "COMPLETE"},
+        "data.options_provider": {"type": "CLIENT", "file": "src/data/options_provider.py", "status": "COMPLETE"},
+        "data.historical_loader": {"type": "CLIENT", "file": "src/data/historical_loader.py", "status": "COMPLETE"},
+        "data.multi_ticker_backtest": {"type": "ENGINE", "file": "src/data/multi_ticker_backtest.py", "status": "COMPLETE"},
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
         "execution.slippage": {"type": "ENGINE", "file": "src/execution/slippage.py", "status": "COMPLETE"},
         "execution.position_manager": {"type": "ENGINE", "file": "src/execution/position_manager.py", "status": "COMPLETE"},
         "execution.alpaca_executor": {"type": "CLIENT", "file": "src/execution/alpaca_executor.py", "status": "COMPLETE"},
         "execution.bridge": {"type": "ENGINE", "file": "src/execution/bridge.py", "status": "COMPLETE"},
+<<<<<<< HEAD
         "monitoring.metrics": {"type": "ENGINE", "file": "src/monitoring/metrics.py", "status": "COMPLETE", "note": "S020: Prometheus-compatible counters/gauges/histograms + JSON/text export"},
         "utils.logging": {"type": "UTILITY", "file": "src/utils/trade_logger.py", "status": "COMPLETE"},
         "cli.main": {"type": "CLI", "file": "main.py", "status": "COMPLETE", "note": "S020: Shapley→Elo wired in Phase 4"}
@@ -42,4 +60,20 @@
     "adrs": ["ADR-001","ADR-002","ADR-003","ADR-004","ADR-005","ADR-006","ADR-007","ADR-008","ADR-009","ADR-010","ADR-011","ADR-012","ADR-013","ADR-014","ADR-015","ADR-016","ADR-017","ADR-018"],
     "math_sections": "§1-§19",
     "test_count": 481
+=======
+        "execution.tranche_monitor": {"type": "ENGINE", "file": "src/execution/tranche_monitor.py", "status": "COMPLETE"},
+        "execution.stop_resubmitter": {"type": "ENGINE", "file": "src/execution/stop_resubmitter.py", "status": "COMPLETE"},
+        "execution.fill_stream_bridge": {"type": "ENGINE", "file": "src/execution/fill_stream_bridge.py", "status": "COMPLETE", "note": "S026: Wired into cmd_paper — background task + drain in Phase 3 + shutdown"},
+        "execution.portfolio_risk": {"type": "ENGINE", "file": "src/execution/portfolio_risk.py", "status": "COMPLETE", "note": "S026: Sector concentration + portfolio heat, wired into Phase 2"},
+        "monitoring.metrics": {"type": "ENGINE", "file": "src/monitoring/metrics.py", "status": "COMPLETE"},
+        "monitoring.server": {"type": "ENGINE", "file": "src/monitoring/server.py", "status": "COMPLETE"},
+        "ops.grafana": {"type": "OPS", "file": "ops/grafana/momentum_x_dashboard.json", "status": "COMPLETE"},
+        "ops.docker": {"type": "OPS", "file": "ops/docker-compose.yml", "status": "COMPLETE"},
+        "utils.logging": {"type": "UTILITY", "file": "src/utils/trade_logger.py", "status": "COMPLETE"},
+        "cli.main": {"type": "CLI", "file": "main.py", "status": "COMPLETE", "note": "S026: FillStreamBridge wired, portfolio risk gate, WebSocket lifecycle"}
+    },
+    "adrs": ["ADR-001","ADR-002","ADR-003","ADR-004","ADR-005","ADR-006","ADR-007","ADR-008","ADR-009","ADR-010","ADR-011","ADR-012","ADR-013","ADR-014","ADR-015","ADR-016","ADR-017","ADR-018","ADR-019","ADR-020","ADR-021","ADR-022","ADR-023","ADR-024"],
+    "math_sections": "§1-§19",
+    "test_count": 673
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
 }

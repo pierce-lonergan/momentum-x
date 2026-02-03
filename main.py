@@ -149,24 +149,64 @@ async def _fetch_scan_quotes(client, settings: Settings) -> dict:
 
     Returns dict of ticker → {current_price, previous_close, premarket_volume, ...}
     suitable for ScanLoop.run_single_scan().
+<<<<<<< HEAD
     """
     try:
         # Use Alpaca most-active or screener endpoint if available
         # For now, fetch snapshots for a watchlist or most-active tickers
+=======
+
+    Uses AlpacaDataClient.get_snapshots() which returns normalized data:
+    {ticker: {last_price, prev_close, volume, bid, ask, ...}}
+
+    Ref: DATA-001 (Alpaca snapshot endpoint)
+    Ref: ADR-002 (Snapshot-based architecture)
+    """
+    try:
+        # Get most-active tickers for scanning universe
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
         tickers = await client.get_most_active_tickers(limit=50)
         if not tickers:
             return {}
 
+<<<<<<< HEAD
+=======
+        # Batch snapshot fetch via normalized client
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
         snapshots = await client.get_snapshots(tickers)
         quotes = {}
         for ticker, snap in snapshots.items():
             try:
+<<<<<<< HEAD
                 current = float(snap.get("latestTrade", {}).get("p", 0) or
                                snap.get("minuteBar", {}).get("c", 0))
                 prev_close = float(snap.get("prevDailyBar", {}).get("c", 0))
                 volume = int(snap.get("minuteBar", {}).get("v", 0) or
                             snap.get("dailyBar", {}).get("v", 0))
                 avg_vol = max(1, int(snap.get("prevDailyBar", {}).get("v", 1)))
+=======
+                # Use normalized field names from AlpacaDataClient._normalize_snapshot
+                current = float(snap.get("last_price", 0))
+                prev_close = float(snap.get("prev_close", 0))
+                volume = int(snap.get("volume", 0))
+                avg_vol = max(1, int(snap.get("prev_volume", 1)))
+                bid = float(snap.get("bid", 0))
+                ask = float(snap.get("ask", 0))
+
+                # Fallback to raw Alpaca fields if normalized fields missing
+                if current <= 0:
+                    current = float(
+                        snap.get("latestTrade", {}).get("p", 0) or
+                        snap.get("minuteBar", {}).get("c", 0)
+                    )
+                if prev_close <= 0:
+                    prev_close = float(snap.get("prevDailyBar", {}).get("c", 0))
+                if volume <= 0:
+                    volume = int(
+                        snap.get("minuteBar", {}).get("v", 0) or
+                        snap.get("dailyBar", {}).get("v", 0)
+                    )
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
 
                 if current > 0 and prev_close > 0:
                     quotes[ticker] = {
@@ -174,8 +214,15 @@ async def _fetch_scan_quotes(client, settings: Settings) -> dict:
                         "previous_close": prev_close,
                         "premarket_volume": volume,
                         "avg_volume_at_time": avg_vol,
+<<<<<<< HEAD
                         "float_shares": None,
                         "market_cap": None,
+=======
+                        "float_shares": snap.get("float_shares"),
+                        "market_cap": snap.get("market_cap"),
+                        "bid": bid,
+                        "ask": ask,
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
                         "has_news": True,  # Conservative: assume news may exist
                     }
             except (ValueError, TypeError, KeyError):
@@ -235,6 +282,15 @@ async def cmd_paper(settings: Settings) -> None:
     from src.execution.alpaca_executor import AlpacaExecutor
     from src.execution.bridge import ExecutionBridge
     from src.execution.position_manager import PositionManager
+<<<<<<< HEAD
+=======
+    from src.execution.tranche_monitor import TrancheExitMonitor, TrancheFillEvent
+    from src.execution.stop_resubmitter import StopResubmitter
+    from src.execution.fill_stream_bridge import FillStreamBridge
+    from src.execution.portfolio_risk import PortfolioRiskManager
+    from src.monitoring.server import MetricsServer
+    from src.monitoring.metrics import reset_metrics
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
 
     if settings.mode != "paper":
         logger.error("Paper command requires mode=paper. Current: %s", settings.mode)
@@ -270,16 +326,57 @@ async def cmd_paper(settings: Settings) -> None:
         executor=executor,
         position_manager=position_manager,
     )
+<<<<<<< HEAD
+=======
+    tranche_monitor = TrancheExitMonitor(position_manager=position_manager)
+    stop_resubmitter = StopResubmitter(client=client)
+    fill_bridge = FillStreamBridge(
+        tranche_monitor=tranche_monitor,
+        stop_resubmitter=stop_resubmitter,
+    )
+    portfolio_risk = PortfolioRiskManager(
+        max_sector_positions=2,
+        max_portfolio_heat_pct=5.0,
+    )
+
+    # ── Launch WebSocket fill stream as background task (ADR-023, D2) ──
+    from src.data.websocket_client import TradeUpdatesStream
+    trade_stream = TradeUpdatesStream(
+        api_key=settings.alpaca.api_key,
+        secret_key=settings.alpaca.secret_key,
+        paper=(settings.mode == "paper"),
+    )
+    trade_stream.on_trade_update = fill_bridge.on_trade_update
+    fill_stream_task: asyncio.Task | None = None
+    try:
+        fill_stream_task = asyncio.create_task(trade_stream.connect())
+        logger.info("WebSocket fill stream launched as background task")
+    except Exception as e:
+        logger.warning("WebSocket fill stream failed to launch: %s — falling back to polling", e)
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
 
     # Track candidates and their ScoredCandidates for execution
     watchlist: list = []  # CandidateStock from Phase 1
     session_trades: int = 0
 
+<<<<<<< HEAD
+=======
+    # ── Start Metrics HTTP Server (ADR-019) ──
+    reset_metrics()
+    metrics_server = MetricsServer(port=9090)
+    metrics_server.start()
+    logger.info("Metrics server: http://0.0.0.0:9090/metrics")
+
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
     # Graceful shutdown handler
     shutdown = asyncio.Event()
 
     def handle_signal(sig, frame):
         logger.info("Shutdown signal received. Closing positions...")
+<<<<<<< HEAD
+=======
+        metrics_server.stop()
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
         shutdown.set()
 
     signal.signal(signal.SIGINT, handle_signal)
@@ -313,6 +410,23 @@ async def cmd_paper(settings: Settings) -> None:
                     verdicts = await orchestrator.evaluate_candidates(watchlist[:5])
                     for verdict in verdicts:
                         if verdict.action == "BUY":
+<<<<<<< HEAD
+=======
+                            # ── Portfolio risk check (ADR-024) ──
+                            risk_check = portfolio_risk.check_entry(
+                                ticker=verdict.ticker,
+                                stop_loss_pct=2.0,  # Default stop distance
+                                positions=bridge.position_manager.open_positions,
+                            )
+                            if not risk_check.allowed:
+                                logger.warning(
+                                    "PORTFOLIO RISK BLOCKED: %s — %s",
+                                    verdict.ticker, risk_check.reason,
+                                )
+                                metrics.risk_vetoes.inc()
+                                continue
+
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
                             # Retrieve scored from orchestrator (cached during eval)
                             order = await bridge.execute_verdict(verdict, scored=None)
                             if order is not None:
@@ -322,8 +436,63 @@ async def cmd_paper(settings: Settings) -> None:
                                     order.ticker, order.qty, order.submitted_price, order.order_id,
                                 )
 
+<<<<<<< HEAD
             elif 10 <= hour_et < 16:
                 # ── Phase 3: Intraday Monitoring ──
+=======
+                                # ── Submit tranche exit orders (ADR-020, D2) ──
+                                try:
+                                    position = None
+                                    for p in bridge.position_manager.open_positions:
+                                        if p.ticker == order.ticker:
+                                            position = p
+                                            break
+
+                                    if position is not None:
+                                        tranches = bridge.position_manager.compute_exit_tranches(position)
+                                        for tranche in tranches:
+                                            tranche_resp = await client.submit_limit_order(
+                                                symbol=order.ticker,
+                                                qty=tranche.qty,
+                                                side="sell",
+                                                limit_price=tranche.target,
+                                            )
+                                            tranche_oid = tranche_resp.get("id", "")
+                                            tranche_monitor.register_tranche_order(
+                                                order_id=tranche_oid,
+                                                ticker=order.ticker,
+                                                tranche_number=tranche.tranche_number,
+                                                target_price=tranche.target,
+                                                qty=tranche.qty,
+                                            )
+                                            logger.info(
+                                                "TRANCHE T%d submitted: %s sell %d @ $%.2f (oid=%s)",
+                                                tranche.tranche_number, order.ticker,
+                                                tranche.qty, tranche.target, tranche_oid,
+                                            )
+                                except Exception as e:
+                                    logger.warning("Tranche order submission error: %s", e)
+
+                                # ── Register initial stop for ratcheting (ADR-022, D2) ──
+                                try:
+                                    stop_resubmitter.register_stop(
+                                        ticker=order.ticker,
+                                        order_id=order.order_id,  # Bracket stop leg ID
+                                        stop_price=verdict.stop_loss,
+                                        qty=order.qty,
+                                    )
+                                    logger.info(
+                                        "STOP registered: %s @ $%.2f (oid=%s)",
+                                        order.ticker, verdict.stop_loss, order.order_id,
+                                    )
+                                except Exception as e:
+                                    logger.warning("Stop registration error: %s", e)
+
+            elif 10 <= hour_et < 16:
+                # ── Phase 3: Intraday Monitoring + VWAP Breakout Scanner ──
+                from src.scanners.intraday_vwap import IntradayVWAPScanner
+
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
                 positions = bridge.position_manager.open_positions
                 logger.info("[Phase 3] Intraday — monitoring %d positions", len(positions))
                 for pos in positions:
@@ -332,6 +501,122 @@ async def cmd_paper(settings: Settings) -> None:
                         pos.ticker, pos.remaining_qty, pos.entry_price, pos.stop_loss,
                     )
 
+<<<<<<< HEAD
+=======
+                # ── Process tranche fills via WebSocket bridge (ADR-023, D2) ──
+                if tranche_monitor.registered_orders > 0:
+                    try:
+                        # Primary path: drain WebSocket fill events (sub-second)
+                        fill_events = await fill_bridge.drain_and_resubmit()
+                        for fev in fill_events:
+                            logger.info(
+                                "TRANCHE T%d FILL (stream): %s @ $%.2f | Stop: $%.2f → $%.2f%s",
+                                fev.tranche_number or 0, fev.ticker,
+                                fev.filled_price, fev.old_stop or 0, fev.new_stop or 0,
+                                " [RATCHETED]" if fev.stop_resubmitted else "",
+                            )
+
+                        # Fallback: position-polling if no WebSocket events detected
+                        if not fill_events:
+                            alpaca_positions = await client.get_positions()
+                            for pos in bridge.position_manager.open_positions:
+                                for ap in alpaca_positions:
+                                    if ap.get("symbol") == pos.ticker:
+                                        live_qty = int(ap.get("qty", 0))
+                                        if live_qty < pos.remaining_qty:
+                                            filled_qty = pos.remaining_qty - live_qty
+                                            live_price = float(ap.get("current_price", pos.entry_price))
+                                            for oid, to in list(tranche_monitor._order_map.items()):
+                                                if to.ticker == pos.ticker and to.qty <= filled_qty:
+                                                    result = tranche_monitor.on_fill(TrancheFillEvent(
+                                                        order_id=oid,
+                                                        ticker=pos.ticker,
+                                                        filled_price=live_price,
+                                                        filled_qty=to.qty,
+                                                    ))
+                                                    if result:
+                                                        logger.info(
+                                                            "TRANCHE T%d FILL (poll): %s @ $%.2f | Stop: $%.2f → $%.2f",
+                                                            result.tranche_number, pos.ticker,
+                                                            live_price, result.old_stop, result.new_stop,
+                                                        )
+                                                        if result.new_stop > result.old_stop:
+                                                            try:
+                                                                resubmit_result = await stop_resubmitter.resubmit(
+                                                                    ticker=pos.ticker,
+                                                                    new_stop_price=result.new_stop,
+                                                                    new_qty=pos.remaining_qty - to.qty,
+                                                                )
+                                                                if resubmit_result.success:
+                                                                    logger.info(
+                                                                        "STOP RATCHETED (poll): %s $%.2f → $%.2f",
+                                                                        pos.ticker, result.old_stop, result.new_stop,
+                                                                    )
+                                                            except Exception as e:
+                                                                logger.warning("Stop resubmit error: %s", e)
+                                                    break
+                    except Exception as e:
+                        logger.debug("Tranche fill check error: %s", e)
+
+                # ── VWAP Breakout Scanner (ADR-018, D2) ──
+                if bridge.position_manager.can_enter_new_position():
+                    try:
+                        quotes = await _fetch_scan_quotes(client, settings)
+                        if quotes:
+                            # Build VWAP snapshots from available data
+                            vwap_snapshots: dict = {}
+                            for ticker, q in quotes.items():
+                                price = q.get("current_price", 0)
+                                prev = q.get("previous_close", 0)
+                                vol = q.get("premarket_volume", 0)
+                                if price > 0 and prev > 0:
+                                    vwap_snapshots[ticker] = {
+                                        "price": price,
+                                        "vwap": prev,  # Use prev_close as VWAP proxy until WebSocket
+                                        "volume": vol,
+                                        "avg_volume": max(1, q.get("avg_volume_at_time", vol)),
+                                    }
+
+                            if not hasattr(cmd_paper, "_vwap_scanner"):
+                                cmd_paper._vwap_scanner = IntradayVWAPScanner()  # type: ignore[attr-defined]
+
+                            vwap_signals = cmd_paper._vwap_scanner.scan(vwap_snapshots)  # type: ignore[attr-defined]
+
+                            if vwap_signals:
+                                logger.info(
+                                    "[Phase 3] %d VWAP breakout signals detected",
+                                    len(vwap_signals),
+                                )
+                                # Convert VWAP signals to CandidateStocks for evaluation
+                                from src.core.models import CandidateStock
+
+                                vwap_candidates = []
+                                for sig in vwap_signals[:3]:  # Cap at 3
+                                    vwap_candidates.append(CandidateStock(
+                                        ticker=sig.ticker,
+                                        current_price=sig.current_price,
+                                        previous_close=sig.vwap,
+                                        gap_pct=sig.breakout_pct,
+                                        gap_classification="VWAP_BREAKOUT",
+                                        rvol=sig.rvol_at_breakout,
+                                        premarket_volume=sig.total_volume,
+                                        scan_phase="intraday",
+                                    ))
+
+                                verdicts = await orchestrator.evaluate_candidates(vwap_candidates)
+                                for verdict in verdicts:
+                                    if verdict.action == "BUY":
+                                        order = await bridge.execute_verdict(verdict, scored=None)
+                                        if order is not None:
+                                            session_trades += 1
+                                            logger.info(
+                                                "VWAP BREAKOUT ORDER: %s qty=%d @ $%.2f",
+                                                order.ticker, order.qty, order.submitted_price,
+                                            )
+                    except Exception as e:
+                        logger.warning("[Phase 3] VWAP scan error: %s", e)
+
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
             else:
                 # ── Phase 4: After-Hours ──
                 positions = bridge.position_manager.open_positions
@@ -376,6 +661,19 @@ async def cmd_paper(settings: Settings) -> None:
                 else:
                     logger.info("[Phase 4] No positions. Session trades: %d", session_trades)
 
+<<<<<<< HEAD
+=======
+                # ── Generate End-of-Day Session Report (ADR-022) ──
+                try:
+                    from src.analysis.session_report import SessionReportGenerator
+                    report_gen = SessionReportGenerator(mode=settings.mode)
+                    report = report_gen.generate()
+                    report_gen.save(report)
+                    logger.info("\n%s", report.summary_text())
+                except Exception as e:
+                    logger.warning("Session report generation failed: %s", e)
+
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
                 # Reset daily state
                 bridge.position_manager.reset_daily()
                 watchlist.clear()
@@ -396,6 +694,19 @@ async def cmd_paper(settings: Settings) -> None:
             exit_price=pos.entry_price,
         )
 
+<<<<<<< HEAD
+=======
+    # ── Shutdown WebSocket fill stream ──
+    trade_stream.stop()
+    if fill_stream_task is not None:
+        fill_stream_task.cancel()
+        try:
+            await fill_stream_task
+        except (asyncio.CancelledError, Exception):
+            pass
+    logger.info("WebSocket fill stream stopped")
+
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
     logger.info("Paper trading stopped. Session trades: %d", session_trades)
 
 
@@ -418,6 +729,10 @@ async def cmd_backtest(settings: Settings) -> None:
     Ref: ADR-016 (Production Wiring, D3)
     """
     from src.core.backtest_simulator import HistoricalBacktestSimulator
+<<<<<<< HEAD
+=======
+    from src.data.historical_loader import HistoricalDataLoader
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
     import json as _json
 
     logger.info("═══ MOMENTUM-X BACKTESTER ═══")
@@ -432,6 +747,7 @@ async def cmd_backtest(settings: Settings) -> None:
         dsr_threshold=0.95,
     )
 
+<<<<<<< HEAD
     # For now: generate synthetic data (historical data loading = future work)
     logger.info("Generating synthetic backtest data...")
     signals, returns = sim.generate_synthetic_data(
@@ -439,12 +755,77 @@ async def cmd_backtest(settings: Settings) -> None:
         signal_accuracy=0.55,
         seed=42,
     )
+=======
+    # ── Data Loading: Multi-ticker, Single-ticker Historical, or Synthetic ──
+    use_multi = hasattr(settings, 'backtest_tickers') and settings.backtest_tickers
+    use_historical = hasattr(settings, 'backtest_ticker') and settings.backtest_ticker
+    strategy_name = "momentum_x_synthetic"
+
+    if use_multi:
+        # Multi-ticker portfolio backtest
+        tickers = settings.backtest_tickers
+        logger.info("Loading multi-ticker historical data: %s...", tickers)
+        try:
+            from src.data.alpaca_client import AlpacaDataClient
+            from src.data.multi_ticker_backtest import MultiTickerBacktest
+            client = AlpacaDataClient(settings.alpaca)
+            loader = HistoricalDataLoader(client=client)
+            multi = MultiTickerBacktest(loader=loader)
+            result = await multi.load_and_merge(
+                tickers=tickers,
+                days=settings.backtest_days,
+            )
+            signals, returns = result.merged_dataset.signals, result.merged_dataset.returns
+            strategy_name = f"momentum_x_portfolio_{'_'.join(tickers[:3])}"
+            logger.info(
+                "Multi-ticker loaded: %d tickers, %d observations, %d BUY signals, %d failed",
+                len(result.per_ticker), result.total_observations,
+                result.total_buy_signals, len(result.failed_tickers),
+            )
+            if result.failed_tickers:
+                logger.warning("Failed tickers: %s", result.failed_tickers)
+        except Exception as e:
+            logger.warning("Multi-ticker load failed (%s), falling back to synthetic", e)
+            signals, returns = sim.generate_synthetic_data(n=500, signal_accuracy=0.55, seed=42)
+
+    elif use_historical:
+        # Historical mode: fetch real OHLCV from Alpaca
+        ticker = settings.backtest_ticker
+        logger.info("Loading historical data for %s...", ticker)
+        try:
+            from src.data.alpaca_client import AlpacaDataClient
+            client = AlpacaDataClient(settings.alpaca)
+            loader = HistoricalDataLoader(client=client)
+            dataset = await loader.load(ticker=ticker, days=settings.backtest_days)
+            signals, returns = dataset.signals, dataset.returns
+            strategy_name = f"momentum_x_{ticker}"
+            logger.info(
+                "Historical data loaded: %d observations, %d BUY signals, %s → %s",
+                dataset.n_observations, dataset.n_buy_signals,
+                dataset.start_date, dataset.end_date,
+            )
+        except Exception as e:
+            logger.warning("Historical data load failed (%s), falling back to synthetic", e)
+            signals, returns = sim.generate_synthetic_data(n=500, signal_accuracy=0.55, seed=42)
+    else:
+        # Synthetic mode (default)
+        logger.info("Generating synthetic backtest data...")
+        signals, returns = sim.generate_synthetic_data(
+            n=500,
+            signal_accuracy=0.55,
+            seed=42,
+        )
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
 
     logger.info("Running backtest: %d observations, model=%s", len(signals), settings.models.tier1_model)
     report = sim.run(
         signals=signals,
         returns=returns,
+<<<<<<< HEAD
         strategy_name="momentum_x_synthetic",
+=======
+        strategy_name=strategy_name,
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
     )
 
     # ── Report ──
@@ -587,6 +968,27 @@ def main() -> None:
         default=True,
         help="Use synthetic data for backtesting (default: True). Future: load historical data.",
     )
+<<<<<<< HEAD
+=======
+    parser.add_argument(
+        "--ticker",
+        type=str,
+        default=None,
+        help="Ticker symbol for historical backtest (e.g., AAPL). Overrides --synthetic.",
+    )
+    parser.add_argument(
+        "--days",
+        type=int,
+        default=252,
+        help="Number of trading days for historical backtest (default: 252).",
+    )
+    parser.add_argument(
+        "--tickers",
+        type=str,
+        default=None,
+        help="Comma-separated tickers for multi-ticker backtest (e.g., AAPL,MSFT,TSLA).",
+    )
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
 
     args = parser.parse_args()
     setup_logging(args.verbose)
@@ -606,6 +1008,17 @@ def main() -> None:
     else:
         settings.mode = "paper"
 
+<<<<<<< HEAD
+=======
+    # Backtest configuration from CLI flags
+    if hasattr(args, 'ticker') and args.ticker:
+        settings.backtest_ticker = args.ticker
+    if hasattr(args, 'days') and args.days:
+        settings.backtest_days = args.days
+    if hasattr(args, 'tickers') and args.tickers:
+        settings.backtest_tickers = [t.strip() for t in args.tickers.split(",")]
+
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
     # Dispatch to command handler
     if args.command == "scan":
         asyncio.run(cmd_scan(settings, interval=args.interval, once=args.once))

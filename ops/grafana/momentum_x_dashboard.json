@@ -1,0 +1,194 @@
+{
+  "__meta": {
+    "note": "MOMENTUM-X Grafana Dashboard. Import via Grafana UI → Dashboards → Import → paste JSON.",
+    "ref": "ADR-019 (Full Observability), ADR-020 (Tranche Monitoring)",
+    "prometheus_target": "localhost:9090",
+    "session": "S023"
+  },
+  "dashboard": {
+    "id": null,
+    "uid": "momentum-x-main",
+    "title": "MOMENTUM-X Trading Dashboard",
+    "tags": ["momentum-x", "trading", "observability"],
+    "timezone": "America/New_York",
+    "refresh": "10s",
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "_row": "Pipeline Performance",
+        "type": "row",
+        "id": 1,
+        "title": "📊 Pipeline Performance",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Scan Iterations",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 0, "y": 1},
+        "targets": [{"expr": "mx_scan_iterations_total", "legendFormat": "Scans"}],
+        "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "blue", "value": null}]}}}
+      },
+      {
+        "id": 3,
+        "title": "Candidates Found",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 4, "y": 1},
+        "targets": [{"expr": "mx_scan_candidates_found_total", "legendFormat": "Candidates"}],
+        "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green", "value": null}]}}}
+      },
+      {
+        "id": 4,
+        "title": "Evaluations Total",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 8, "y": 1},
+        "targets": [{"expr": "mx_evaluations_total", "legendFormat": "Evals"}],
+        "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "purple", "value": null}]}}}
+      },
+      {
+        "id": 5,
+        "title": "Pipeline Latency (p50/p99)",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 1},
+        "targets": [
+          {"expr": "mx_pipeline_latency_seconds_mean", "legendFormat": "Mean"},
+          {"expr": "mx_pipeline_latency_seconds_min", "legendFormat": "Min"},
+          {"expr": "mx_pipeline_latency_seconds_max", "legendFormat": "Max"}
+        ],
+        "fieldConfig": {"defaults": {"unit": "s"}}
+      },
+      {
+        "id": 6,
+        "title": "GEX Filter Rejection Rate",
+        "type": "gauge",
+        "gridPos": {"h": 4, "w": 4, "x": 0, "y": 5},
+        "targets": [{"expr": "mx_gex_filter_rejections_total / (mx_gex_filter_rejections_total + mx_gex_filter_passes_total)", "legendFormat": "Rejection %"}],
+        "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.5}, {"color": "red", "value": 0.8}]}}}
+      },
+      {
+        "id": 7,
+        "title": "Debates Triggered / BUY",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 4, "y": 5},
+        "targets": [
+          {"expr": "mx_debates_triggered_total", "legendFormat": "Triggered"},
+          {"expr": "mx_debates_buy_total", "legendFormat": "BUY"}
+        ],
+        "fieldConfig": {"defaults": {"unit": "none"}}
+      },
+      {
+        "id": 8,
+        "title": "Risk Vetoes",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 8, "y": 5},
+        "targets": [{"expr": "mx_risk_vetoes_total", "legendFormat": "Vetoes"}],
+        "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 3}]}}}
+      },
+      {
+        "_row": "Agent Performance",
+        "type": "row",
+        "id": 10,
+        "title": "🤖 Agent Performance",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 9}
+      },
+      {
+        "id": 11,
+        "title": "Agent Elo Ratings",
+        "type": "bargauge",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 10},
+        "targets": [{"expr": "mx_agent_elo_ratings", "legendFormat": "{{agent}}"}],
+        "fieldConfig": {"defaults": {"unit": "none", "min": 900, "max": 1600, "thresholds": {"steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 1100}, {"color": "green", "value": 1300}]}}}
+      },
+      {
+        "id": 12,
+        "title": "Agent Latency Distribution",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 10},
+        "targets": [
+          {"expr": "mx_agent_latency_seconds_mean", "legendFormat": "Mean"},
+          {"expr": "mx_agent_latency_seconds_max", "legendFormat": "Max"}
+        ],
+        "fieldConfig": {"defaults": {"unit": "s"}}
+      },
+      {
+        "id": 13,
+        "title": "Agent Errors",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 0, "y": 18},
+        "targets": [{"expr": "mx_agent_errors_total", "legendFormat": "Errors"}],
+        "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}}
+      },
+      {
+        "_row": "Risk & Circuit Breaker",
+        "type": "row",
+        "id": 20,
+        "title": "🛡️ Risk & Circuit Breaker",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 22}
+      },
+      {
+        "id": 21,
+        "title": "Daily P&L",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 23},
+        "targets": [{"expr": "mx_daily_pnl", "legendFormat": "P&L"}],
+        "fieldConfig": {"defaults": {"unit": "currencyUSD", "color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 0}, {"color": "green", "value": 100}]}}}
+      },
+      {
+        "id": 22,
+        "title": "Circuit Breaker Activations",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 4, "x": 8, "y": 23},
+        "targets": [{"expr": "mx_circuit_breaker_activations_total", "legendFormat": "CB Hits"}],
+        "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}}
+      },
+      {
+        "id": 23,
+        "title": "Fill Slippage (bps)",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 23},
+        "targets": [
+          {"expr": "mx_fill_slippage_bps_mean", "legendFormat": "Mean"},
+          {"expr": "mx_fill_slippage_bps_max", "legendFormat": "Max"}
+        ],
+        "fieldConfig": {"defaults": {"unit": "none", "custom": {"axisLabel": "bps"}}}
+      },
+      {
+        "_row": "Execution",
+        "type": "row",
+        "id": 30,
+        "title": "⚡ Execution",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 29}
+      },
+      {
+        "id": 31,
+        "title": "Open Positions",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 0, "y": 30},
+        "targets": [{"expr": "mx_open_positions", "legendFormat": "Open"}],
+        "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "blue", "value": null}, {"color": "orange", "value": 3}]}}}
+      },
+      {
+        "id": 32,
+        "title": "Orders Submitted / Filled",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 4, "y": 30},
+        "targets": [
+          {"expr": "mx_orders_submitted_total", "legendFormat": "Submitted"},
+          {"expr": "mx_orders_filled_total", "legendFormat": "Filled"}
+        ],
+        "fieldConfig": {"defaults": {"unit": "none"}}
+      },
+      {
+        "id": 33,
+        "title": "Session Trades",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 4, "x": 8, "y": 30},
+        "targets": [{"expr": "mx_session_trades_total", "legendFormat": "Trades"}],
+        "fieldConfig": {"defaults": {"unit": "none", "color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "blue", "value": null}]}}}
+      }
+    ]
+  }
+}

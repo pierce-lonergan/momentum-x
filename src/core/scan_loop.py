@@ -32,6 +32,10 @@ from config.settings import Settings
 from src.core.models import CandidateStock
 from src.scanners.premarket import scan_premarket_gappers
 from src.scanners.gex_filter import should_reject_gex
+<<<<<<< HEAD
+=======
+from src.monitoring.metrics import get_metrics
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +86,12 @@ class ScanLoop:
         if not quotes:
             return []
 
+<<<<<<< HEAD
+=======
+        metrics = get_metrics()
+        metrics.scan_iterations.inc()
+
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
         # Step 1: Build Polars DataFrame from raw quotes
         df = self._quotes_to_dataframe(quotes)
         if df.is_empty():
@@ -103,12 +113,21 @@ class ScanLoop:
 
             # Hard filter: reject extreme positive GEX
             if should_reject_gex(gex_norm):
+<<<<<<< HEAD
+=======
+                metrics.gex_filter_rejections.inc()
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
                 logger.info(
                     "GEX hard filter rejected %s (GEX_norm=%.3f)",
                     candidate.ticker, gex_norm or 0.0,
                 )
                 continue
 
+<<<<<<< HEAD
+=======
+            metrics.gex_filter_passes.inc()
+
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
             # Enrich candidate with GEX data if available
             if gex_norm is not None:
                 # Reconstruct with GEX fields (CandidateStock is frozen)
@@ -135,6 +154,10 @@ class ScanLoop:
             "Scan iteration: %d quotes → %d EMC candidates → %d after GEX filter",
             len(quotes), len(candidates), len(filtered),
         )
+<<<<<<< HEAD
+=======
+        metrics.scan_candidates_found.inc(len(filtered))
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
 
         return filtered
 

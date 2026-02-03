@@ -39,6 +39,10 @@ from config.settings import Settings
 from src.core.models import ScoredCandidate, TradeVerdict
 from src.execution.alpaca_executor import AlpacaExecutor, OrderResult
 from src.execution.position_manager import ManagedPosition, PositionManager
+<<<<<<< HEAD
+=======
+from src.monitoring.metrics import get_metrics
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +130,13 @@ class ExecutionBridge:
             )
 
         # ── Submit order to Alpaca ──
+<<<<<<< HEAD
         try:
+=======
+        bridge_metrics = get_metrics()
+        try:
+            bridge_metrics.orders_submitted.inc()
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
             order_result = await self._executor.execute(verdict)
         except Exception as e:
             logger.error("%s: Executor failed: %s", ticker, e)
@@ -151,6 +161,16 @@ class ExecutionBridge:
         )
 
         self._pm.add_position(position)
+<<<<<<< HEAD
+=======
+        bridge_metrics.orders_filled.inc()
+        bridge_metrics.open_positions.set(len(self._pm.open_positions))
+
+        # Track fill slippage in basis points
+        if verdict.entry_price > 0 and order_result.submitted_price > 0:
+            slippage_bps = abs(order_result.submitted_price - verdict.entry_price) / verdict.entry_price * 10000
+            bridge_metrics.fill_slippage_bps.observe(slippage_bps)
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
 
         logger.info(
             "%s: Position opened — qty=%d, entry=$%.2f, stop=$%.2f, "
@@ -203,6 +223,13 @@ class ExecutionBridge:
         )
 
         if enriched is not None:
+<<<<<<< HEAD
+=======
+            close_metrics = get_metrics()
+            close_metrics.session_trades.inc()
+            close_metrics.open_positions.set(len(self._pm.open_positions))
+            close_metrics.daily_pnl.inc(enriched.pnl)
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
             logger.info(
                 "%s: Closed with attribution — PnL=$%.2f, MFCS=%.3f",
                 ticker,

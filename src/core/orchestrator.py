@@ -26,6 +26,10 @@ from datetime import datetime, timezone
 from typing import Any
 
 from config.settings import Settings
+<<<<<<< HEAD
+=======
+from src.monitoring.metrics import get_metrics
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
 from src.core.models import (
     AgentSignal,
     CandidateStock,
@@ -271,6 +275,12 @@ class Orchestrator:
             ticker, candidate.gap_pct * 100, candidate.rvol,
         )
 
+<<<<<<< HEAD
+=======
+        metrics = get_metrics()
+        metrics.evaluations_total.inc()
+
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
         # ── Phase 1: Parallel Agent Dispatch ──
         # Auto-query SEC if client available and no filings provided
         effective_sec = sec_filings or {}
@@ -308,6 +318,10 @@ class Orchestrator:
         # ── Phase 3: Debate (conditional) ──
         debate_result: DebateResult | None = None
         if scored.qualifies_for_debate:
+<<<<<<< HEAD
+=======
+            metrics.debates_triggered.inc()
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
             logger.info("%s → Entering debate engine", ticker)
             debate_result = await self._debate_engine.run_debate(scored)
             logger.info(
@@ -316,6 +330,12 @@ class Orchestrator:
                 debate_result.debate_divergence,
             )
 
+<<<<<<< HEAD
+=======
+            if debate_result.verdict == "BUY":
+                metrics.debates_buy.inc()
+
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
             # No trade if debate says so
             if debate_result.verdict == "NO_TRADE":
                 return self._build_no_trade_verdict(
@@ -329,6 +349,10 @@ class Orchestrator:
             logger.warning(
                 "%s VETOED by Risk Agent: %s", ticker, risk_signal.veto_reason
             )
+<<<<<<< HEAD
+=======
+            metrics.risk_vetoes.inc()
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
             return self._build_no_trade_verdict(
                 candidate, scored, debate_result,
                 reason=f"Risk VETO: {risk_signal.veto_reason}",
@@ -336,6 +360,10 @@ class Orchestrator:
 
         # ── Phase 5: Build Trade Verdict ──
         pipeline_ms = (time.monotonic() - pipeline_start) * 1000
+<<<<<<< HEAD
+=======
+        metrics.pipeline_latency.observe(pipeline_ms / 1000.0)  # Convert to seconds
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
         logger.info(
             "%s Pipeline complete in %.0fms", ticker, pipeline_ms
         )
@@ -539,10 +567,18 @@ class Orchestrator:
         analytical_results = await asyncio.gather(*analytical_tasks, return_exceptions=True)
 
         signals: list[AgentSignal] = []
+<<<<<<< HEAD
+=======
+        dispatch_metrics = get_metrics()
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
         for result in analytical_results:
             if isinstance(result, AgentSignal):
                 signals.append(result)
             elif isinstance(result, Exception):
+<<<<<<< HEAD
+=======
+                dispatch_metrics.agent_errors.inc()
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
                 logger.error("Analytical agent error: %s", result)
 
         # ── Phase B: Risk agent receives all analytical signals ──

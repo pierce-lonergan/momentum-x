@@ -6,7 +6,11 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+<<<<<<< HEAD
 [![Tests](https://img.shields.io/badge/tests-412%20passing-brightgreen.svg)](#testing)
+=======
+[![Tests](https://img.shields.io/badge/tests-637%20passing-brightgreen.svg)](#testing)
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
 ---
@@ -31,7 +35,21 @@ Momentum-X is an open-source algorithmic trading framework that uses **multiple 
 
 **Production Infrastructure** — Real-time WebSocket streaming (SIP feed), SEC EDGAR dilution detection, Almgren-Chriss slippage modeling, circuit breakers, trailing stops, scaled exits, and structured JSON logging with correlation IDs.
 
+<<<<<<< HEAD
 **412 Tests, Zero Magic Numbers** — Every threshold, weight, and constant traces to an academic paper or formal derivation. Property-based tests (Hypothesis), integration tests, and mathematical invariant verification.
+=======
+**3-Tranche Scaled Exits** — Automatic limit sell orders at +10%/+20%/+30% with stop ratcheting: T1 fill → stop to breakeven, T2 fill → stop to T1 target. WebSocket FillStreamBridge provides sub-second fill detection with position-polling fallback.
+
+**Portfolio Risk Management** — Sector concentration limits (max 2 positions per sector), portfolio heat tracking (max 5% total stop distance), GICS-style sector mapping for 100+ common momentum tickers.
+
+**One-Command Observability** — `cd ops && docker compose up -d` launches Prometheus + Grafana with auto-provisioned dashboard: 17 metrics across 4 rows (Pipeline, Agents, Risk, Execution), 10s refresh.
+
+**Multi-Ticker Portfolio Backtesting** — `--tickers AAPL,MSFT,TSLA` runs chronologically interleaved CPCV across multiple assets, eliminating single-ticker selection bias.
+
+**End-of-Day Session Reports** — Automatic JSON + text reports after each trading session: pipeline stats, execution summary, P&L, risk events, agent performance, GEX filter effectiveness.
+
+**637 Tests, Zero Magic Numbers** — Every threshold, weight, and constant traces to an academic paper or formal derivation. Property-based tests (Hypothesis), integration tests, and mathematical invariant verification.
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
 
 ---
 
@@ -83,7 +101,11 @@ Momentum-X is an open-source algorithmic trading framework that uses **multiple 
 
 ```bash
 # Clone
+<<<<<<< HEAD
 git clone https://github.com/pierce-lonergan/momentum-x.git
+=======
+git clone https://github.com/momentum-x/momentum-x.git
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
 cd momentum-x
 
 # Install
@@ -91,7 +113,11 @@ pip install -e ".[dev]"
 
 # Run tests — no API keys needed
 python -m pytest tests/ -q
+<<<<<<< HEAD
 # ✅ 412 passed
+=======
+# ✅ 637 passed
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
 
 # Configure
 cp .env.example .env
@@ -305,7 +331,11 @@ momentum-x/
 │       ├── trade_logger.py        # JSON structured logging + correlation IDs
 │       └── trade_filter.py        # Trade condition filtering
 │
+<<<<<<< HEAD
 ├── tests/                         # 412 tests across 36 files
+=======
+├── tests/                         # 637 tests across 44 files
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
 │   ├── unit/                      # 24 unit test files
 │   ├── integration/               # 5 integration test files
 │   └── property/                  # 2 property-based test files (Hypothesis)
@@ -319,7 +349,11 @@ momentum-x/
 ## Testing
 
 ```bash
+<<<<<<< HEAD
 python -m pytest tests/ -q                       # Full suite (412 tests)
+=======
+python -m pytest tests/ -q                       # Full suite (637 tests)
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
 python -m pytest tests/unit/ -v                  # Unit only
 python -m pytest tests/property/ -v              # Property-based (Hypothesis)
 python -m pytest tests/integration/ -v           # Integration + end-to-end
@@ -374,7 +408,11 @@ Full bibliography: [`docs/research/BIBLIOGRAPHY.md`](docs/research/BIBLIOGRAPHY.
 
 ## Architecture Decision Records
 
+<<<<<<< HEAD
 15 ADRs document every significant trade-off:
+=======
+24 ADRs document every significant trade-off:
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
 
 | ADR | Decision |
 |-----|----------|
@@ -443,7 +481,11 @@ The protocol has successfully maintained architectural coherence across 16+ deve
 See [CONTRIBUTING.md](CONTRIBUTING.md). Quick start:
 
 ```bash
+<<<<<<< HEAD
 git clone https://github.com/pierce-lonergan/momentum-x.git
+=======
+git clone https://github.com/YOUR_USERNAME/momentum-x.git
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
 cd momentum-x && pip install -e ".[dev]" && pre-commit install
 python -m pytest tests/ -q   # Should see 412 passed
 ```

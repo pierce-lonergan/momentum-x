@@ -238,6 +238,23 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO")
     max_candidates_per_scan: int = Field(default=20)
 
+<<<<<<< HEAD
+=======
+    # Backtest settings
+    backtest_ticker: str | None = Field(
+        default=None,
+        description="Ticker for historical backtest. None = synthetic data.",
+    )
+    backtest_days: int = Field(
+        default=252,
+        description="Number of trading days for historical backtest.",
+    )
+    backtest_tickers: list[str] | None = Field(
+        default=None,
+        description="Multi-ticker list for portfolio-level backtest.",
+    )
+
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
 
 def load_settings() -> Settings:
     """Load settings from environment variables with validation."""

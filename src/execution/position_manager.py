@@ -23,6 +23,11 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass, field
+<<<<<<< HEAD
+=======
+
+from src.monitoring.metrics import get_metrics
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
 from datetime import datetime, timezone
 
 from config.settings import ExecutionConfig
@@ -120,6 +125,10 @@ class PositionManager:
         Blocked by: circuit breaker, max positions.
         """
         if self.is_circuit_breaker_active:
+<<<<<<< HEAD
+=======
+            get_metrics().circuit_breaker_activations.inc()
+>>>>>>> 8cadacb (S026: FillStreamBridge wired, portfolio risk, Docker stack, 673 tests)
             logger.warning("Circuit breaker ACTIVE — no new entries")
             return False
         if len(self._positions) >= self._config.max_positions:
